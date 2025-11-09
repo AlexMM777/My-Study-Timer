@@ -76,16 +76,16 @@ This app is intended to run locally so your Spotify credentials stay private.
   - Ensure your Spotify account is Premium, the device “My Study Timer” is active (the app transfers playback automatically on first connect), and the page has focus.
 
 ## Project Structure
-My-Study-Timer/
-   public/
-      index.html
-      style.css
-      script.js
-      work_start.wav
-      short_break.wav
-      long_break.wav
-   server.js
-   package.json
-   .env.example
-   .gitignore
-   README.md
+- My-Study-Timer/
+   - public/
+      - index.html
+      - style.css
+      - script.js
+      - work_start.wav
+      - short_break.wav
+      - long_break.wav
+   - server.js
+   - package.json
+   - .env.example
+   - .gitignore
+   - README.md
