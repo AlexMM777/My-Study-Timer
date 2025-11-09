@@ -1,0 +1,26 @@
+{
+  "name": "my-study-timer",
+  "version": "1.0.0",
+  "description": "My Study Timer: a customizable Pomodoro timer with YouTube ambience and Spotify Premium controls.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexMM777/My-Study-Timer.git"
+  },
+  "keywords": ["pomodoro", "study", "spotify", "youtube", "timer"],
+  "author": "AlexMM777",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/AlexMM777/My-Study-Timer/issues"
+  },
+  "homepage": "https://github.com/AlexMM777/My-Study-Timer#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2"
+  }
+}
