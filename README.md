@@ -45,9 +45,9 @@ This app is intended to run locally so your Spotify credentials stay private.
    - Open http://127.0.0.1:3000/ in your browser.
 
 6) Connect Spotify
-- Click “Login with Spotify” once; the popup will close automatically.
-- The login button and status text will hide after the player is ready.
-- Press Start to begin the timer and resume music according to your break behavior setting.
+   - Click “Login with Spotify” once; the popup will close automatically.
+   - The login button and status text will hide after the player is ready.
+   - Press Start to begin the timer and resume music according to your break behavior setting.
 
 ## Using the App
 
