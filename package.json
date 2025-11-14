@@ -18,7 +18,7 @@
     "url": "https://github.com/AlexMM777/My-Study-Timer/issues"
   },
   "homepage": "https://github.com/AlexMM777/My-Study-Timer#readme",
-  "dependencies": {
+  "devDependencies": {
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "node-fetch": "^3.3.2"
