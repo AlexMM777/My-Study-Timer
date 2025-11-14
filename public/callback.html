@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spotify Auth Callback</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #1DB954 0%, #191414 100%);
+    }
+    .container {
+      text-align: center;
+      color: white;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 4px solid #1DB954;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error {
+      color: #ff6b6b;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Authenticating...</h1>
+    <div class="spinner"></div>
+    <p id="message">Processing your Spotify login...</p>
+  </div>
+
+  <script>
+    const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
+
+    async function sha256(plain) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(plain);
+      return crypto.subtle.digest('SHA-256', data);
+    }
+
+    function base64UrlEncode(arrayBuffer) {
+      const byteArray = new Uint8Array(arrayBuffer);
+      let binaryString = '';
+      for (let i = 0; i < byteArray.length; i++) {
+        binaryString += String.fromCharCode(byteArray[i]);
+      }
+      return btoa(binaryString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function handleCallback() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const error = params.get('error');
+
+        if (error) {
+          document.getElementById('message').textContent = `Error: ${error}`;
+          document.getElementById('message').parentElement.classList.add('error');
+          // Close the window after 3 seconds
+          setTimeout(() => window.close(), 3000);
+          return;
+        }
+
+        if (!code) {
+          throw new Error('No authorization code received');
+        }
+
+        // Get the code_verifier from sessionStorage
+        const codeVerifier = sessionStorage.getItem('spotify_code_verifier');
+        if (!codeVerifier) {
+          throw new Error('Code verifier not found. Please try logging in again.');
+        }
+
+        // Exchange code for token using PKCE
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: 'http://127.0.0.1:3000/callback', // Update to your Firebase URL
+            client_id: CLIENT_ID,
+            code_verifier: codeVerifier
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Token exchange failed: ${errorData.error || response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Store tokens in localStorage
+        localStorage.setItem('spotify_access_token', data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem('spotify_refresh_token', data.refresh_token);
+        }
+
+        // Clear the code verifier
+        sessionStorage.removeItem('spotify_code_verifier');
+
+        // Notify the parent window and close
+        document.getElementById('message').textContent = 'Success! Redirecting...';
+        
+        if (window.opener) {
+          // If opened as popup, send message to parent
+          window.opener.postMessage({
+            type: 'spotify-auth-success',
+            access_token: data.access_token,
+            refresh_token: data.refresh_token
+          }, '*');
+          setTimeout(() => window.close(), 1000);
+        } else {
+          // If direct navigation, redirect back to main page
+          setTimeout(() => {
+            window.location.href = '/?access_token=' + encodeURIComponent(data.access_token) + 
+                                   (data.refresh_token ? '&refresh_token=' + encodeURIComponent(data.refresh_token) : '');
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        document.getElementById('message').textContent = `Error: ${error.message}`;
+        document.getElementById('message').parentElement.classList.add('error');
+        setTimeout(() => {
+          if (window.opener) {
+            window.close();
+          } else {
+            window.location.href = '/';
+          }
+        }, 3000);
+      }
+    }
+
+    // Run when page loads
+    window.addEventListener('DOMContentLoaded', handleCallback);
+  </script>
+</body>
+</html>

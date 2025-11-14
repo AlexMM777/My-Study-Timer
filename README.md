@@ -19,7 +19,7 @@ This app is intended to run locally to ensure your Spotify credentials remain pr
 
     - Node.js 18+ (for fetch, ESM-compatible dependencies)
     - A Spotify Premium account
-    - A Spotify Developer App (to obtain a Client ID/Secret)
+    - A Spotify Developer App (to obtain a Client ID)
     - A modern desktop browser (Chrome, Edge, Firefox, Safari)
 
 ## Quick Start
@@ -33,24 +33,25 @@ This app is intended to run locally to ensure your Spotify credentials remain pr
 
 3) Create a Spotify app
     - Go to https://developer.spotify.com/dashboard.
-    - Create a new app; note the Client ID and Client Secret.
-    - In your app's settings, add this exact Redirect URI:
-    - http://127.0.0.1:3000/auth/callback
+    - Create a new app; note the Client ID (you do NOT need the Client Secret).
+    - In your app's settings, add these Redirect URIs:
+        - For local development: http://127.0.0.1:3000/callback
+        - For Firebase deployment: https://my-study-timer.web.app/callback (replace with your Firebase URL)
 
 4) Create your .env file
     - Copy the example file: cp .env.example .env
     - Edit .env and fill in your details:
         - SPOTIFY_CLIENT_ID=your_client_id_here
-        - SPOTIFY_CLIENT_SECRET=your_client_secret_here
-        - SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/auth/callback
         - PORT=3000
+    - Note: You no longer need SPOTIFY_CLIENT_SECRET. The app uses PKCE (Proof Key for Code Exchange) for secure authentication.
 
 5) Run the server
     - npm start
     - Open http://127.0.0.1:3000/ in your browser.
 
 6) Connect Spotify
-    - Click “Login with Spotify” once. The popup will handle authentication and close automatically.
+    - Click "Login with Spotify" once. A popup will open for Spotify authentication.
+    - After authorizing, the popup closes automatically and you're logged in.
     - The login button and status text will hide once the player is ready.
     - Press the Start button to begin the timer and music.
 
@@ -69,8 +70,9 @@ This app is intended to run locally to ensure your Spotify credentials remain pr
 ## Privacy & Security
 
 - Do not commit your .env file. The project's .gitignore is configured to prevent this.
-- The server only reads Spotify secrets from your local environment variables and never exposes them.
-- All user preferences (durations, links, sound URLs) are stored only in your browser’s localStorage.
+- **No Client Secret is stored or used.** This app uses the PKCE (Proof Key for Code Exchange) flow, which is specifically designed for public clients. Authentication is handled entirely on the client-side without needing a backend secret.
+- All user preferences (durations, links, sound URLs) are stored only in your browser's localStorage.
+- Access tokens and refresh tokens are stored securely in localStorage and used to authenticate with Spotify's API.
 
 ## Common Issues
 
@@ -84,10 +86,11 @@ This app is intended to run locally to ensure your Spotify credentials remain pr
 - My-Study-Timer/
     - public/
         - index.html
+        - callback.html (Spotify OAuth callback handler)
         - style.css
         - js/
             - main.js
-            - spotify.js
+            - spotify.js (PKCE authentication flow)
             - storage.js
             - timer.js
             - ui.js
@@ -95,7 +98,7 @@ This app is intended to run locally to ensure your Spotify credentials remain pr
         - work_start.wav
         - short_break.wav
         - long_break.wav
-    - server.js
+    - server.js (Express server for local development)
     - package.json
     - .env.example
     - .gitignore

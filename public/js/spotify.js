@@ -1,4 +1,14 @@
-// spotify.js - Spotify auth, player, now playing, volume/transport
+// spotify.js - Spotify auth (PKCE flow), player, now playing, volume/transport
+
+const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
+const REDIRECT_URI = 'http://127.0.0.1:3000/callback'; // Update this to your Firebase URL
+const SCOPES = [
+  'streaming',
+  'user-read-playback-state',
+  'user-modify-playback-state',
+  'user-read-currently-playing'
+].join(' ');
+
 let spotifyPlayer = null;
 let spotifyDeviceId = null;
 let hasConnectedOnce = false;
@@ -8,12 +18,106 @@ let lastTrackId = null;
 
 export function getDeviceId() { return spotifyDeviceId; }
 
+/* -------- PKCE helpers -------- */
+function generateRandomString(length) {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return result;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return crypto.subtle.digest('SHA-256', data);
+}
+
+function base64UrlEncode(arrayBuffer) {
+  const byteArray = new Uint8Array(arrayBuffer);
+  let binaryString = '';
+  for (let i = 0; i < byteArray.length; i++) {
+    binaryString += String.fromCharCode(byteArray[i]);
+  }
+  return btoa(binaryString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function generateCodeChallenge(codeVerifier) {
+  const hash = await sha256(codeVerifier);
+  return base64UrlEncode(hash);
+}
+
+/* -------- Token management (localStorage) -------- */
+function getAccessToken() {
+  return localStorage.getItem('spotify_access_token');
+}
+
+function setAccessToken(token) {
+  if (token) {
+    localStorage.setItem('spotify_access_token', token);
+  } else {
+    localStorage.removeItem('spotify_access_token');
+  }
+}
+
+function getRefreshToken() {
+  return localStorage.getItem('spotify_refresh_token');
+}
+
+function setRefreshToken(token) {
+  if (token) {
+    localStorage.setItem('spotify_refresh_token', token);
+  } else {
+    localStorage.removeItem('spotify_refresh_token');
+  }
+}
+
 async function fetchToken() {
+  let token = getAccessToken();
+  if (token) return token;
+
+  // Try to refresh if refresh token exists
+  const refreshToken = getRefreshToken();
+  if (refreshToken) {
+    token = await refreshAccessToken(refreshToken);
+    if (token) return token;
+  }
+
+  return null;
+}
+
+async function refreshAccessToken(refreshToken) {
   try {
-    const r = await fetch('/auth/token');
-    const j = await r.json();
-    return j.access_token || null;
-  } catch { return null; }
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: CLIENT_ID
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Token refresh failed:', response.status);
+      setRefreshToken(null);
+      setAccessToken(null);
+      return null;
+    }
+
+    const data = await response.json();
+    setAccessToken(data.access_token);
+    if (data.refresh_token) {
+      setRefreshToken(data.refresh_token);
+    }
+    return data.access_token;
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return null;
+  }
 }
 
 async function getJson(url) {
@@ -71,14 +175,27 @@ export function stopNowPlayingPolling() {
 
 export function initSpotifyAuth({ onReady }) {
   const loginBtn = document.getElementById('loginSpotify');
-  loginBtn?.addEventListener('click', () => {
-    window.open('/auth/login', 'spotify-login', 'width=500,height=700');
-  });
+  loginBtn?.addEventListener('click', initiateLogin);
 
+  // Check if we just returned from OAuth callback (handles case where callback.html redirects back)
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('access_token');
+  if (token) {
+    setAccessToken(token);
+    const refreshToken = params.get('refresh_token');
+    if (refreshToken) setRefreshToken(refreshToken);
+    // Clean up URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Listen for messages from callback window (if using popup)
   window.addEventListener('message', async (ev) => {
     if (ev.data && ev.data.type === 'spotify-auth-success') {
-      const token = await fetchToken();
-      setAuthUI(!!token, !!spotifyDeviceId);
+      setAccessToken(ev.data.access_token);
+      if (ev.data.refresh_token) {
+        setRefreshToken(ev.data.refresh_token);
+      }
+      setAuthUI(!!getAccessToken(), !!spotifyDeviceId);
       bootPlayer(onReady);
     }
   });
@@ -86,7 +203,33 @@ export function initSpotifyAuth({ onReady }) {
   window.onSpotifyWebPlaybackSDKReady = () => bootPlayer(onReady);
 
   // Initial UI state
-  fetchToken().then(token => setAuthUI(!!token, !!spotifyDeviceId));
+  setAuthUI(!!getAccessToken(), !!spotifyDeviceId);
+}
+
+async function initiateLogin() {
+  // Generate PKCE values
+  const codeVerifier = generateRandomString(128);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  // Store code_verifier in sessionStorage (only needed during this session)
+  sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+
+  // Build authorization URL
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256'
+  });
+
+  // Open in popup or redirect (using popup approach)
+  window.open(
+    'https://accounts.spotify.com/authorize?' + params.toString(),
+    'spotify-login',
+    'width=500,height=700'
+  );
 }
 
 async function bootPlayer(onReady) {
