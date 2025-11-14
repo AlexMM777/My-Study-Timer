@@ -105,6 +105,7 @@ async function refreshAccessToken(refreshToken) {
       console.error('Token refresh failed:', response.status);
       setRefreshToken(null);
       setAccessToken(null);
+      setAuthUI(false, false);
       return null;
     }
 
@@ -116,6 +117,9 @@ async function refreshAccessToken(refreshToken) {
     return data.access_token;
   } catch (error) {
     console.error('Token refresh error:', error);
+    setRefreshToken(null);
+    setAccessToken(null);
+    setAuthUI(false, false);
     return null;
   }
 }
