@@ -1,7 +1,7 @@
 // spotify.js - Spotify auth (PKCE flow), player, now playing, volume/transport
 
 const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
-const REDIRECT_URI = 'http://127.0.0.1:3000/callback'; // Update this to your Firebase URL
+const REDIRECT_URI = 'https://my-study-timer.web.app/callback'; // Update this to your Firebase URL
 const SCOPES = [
   'streaming',
   'user-read-playback-state',

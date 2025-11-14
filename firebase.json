@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/callback",
+        "destination": "/callback.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
