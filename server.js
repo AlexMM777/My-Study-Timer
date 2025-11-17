@@ -1,5 +1,5 @@
 // server.js - Simple static file server for local development
-// For production, use Firebase Hosting (no backend needed)
+// For production, use Firebase Hosting
 
 const express = require('express');
 const path = require('path');
