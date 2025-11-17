@@ -1,7 +1,7 @@
 // spotify.js - Spotify auth (PKCE flow), player, now playing, volume/transport
 
 const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
-const REDIRECT_URI = 'https://my-study-timer.web.app/callback'; // Update this to your Firebase URL
+const REDIRECT_URI = 'http://127.0.0.1:3000/callback';// enable this when deploying to firebase -> 'https://my-study-timer.web.app/callback'; // Update this to your Firebase URL
 const SCOPES = [
   'streaming',
   'user-read-playback-state',
@@ -260,9 +260,20 @@ async function bootPlayer(onReady) {
       setAuthUI(true, false);
     });
 
-    spotifyPlayer.addListener('initialization_error', ({ message }) => console.error('init_error', message));
-    spotifyPlayer.addListener('authentication_error', ({ message }) => console.error('auth_error', message));
-    spotifyPlayer.addListener('account_error', ({ message }) => console.error('account_error', message));
+    spotifyPlayer.addListener('initialization_error', ({ message }) => {
+      console.error('init_error:', message);
+      setAuthUI(false, false);
+    });
+    spotifyPlayer.addListener('authentication_error', ({ message }) => {
+      console.error('auth_error:', message);
+      setRefreshToken(null);
+      setAccessToken(null);
+      setAuthUI(false, false);
+    });
+    spotifyPlayer.addListener('account_error', ({ message }) => {
+      console.error('account_error:', message);
+      setAuthUI(false, false);
+    });
 
     await spotifyPlayer.connect();
   }

@@ -98,7 +98,7 @@
           body: new URLSearchParams({
             grant_type: 'authorization_code',
             code: code,
-            redirect_uri: 'https://my-study-timer.web.app/callback', // Update to your Firebase URL
+            redirect_uri: 'http://127.0.0.1:3000/callback', // Update to your Firebase URL
             client_id: CLIENT_ID,
             code_verifier: codeVerifier
           })
