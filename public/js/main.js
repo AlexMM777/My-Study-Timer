@@ -4,8 +4,10 @@ import { initSpotifyAuth, startNowPlayingPolling } from './spotify.js';
 import { initTimer } from './timer.js';
 import { getPrefs } from './storage.js';
 import { bindUI, updateNowPlayingText } from './ui.js';
+import initAuthUI from './auth-ui.js';
 
 window.addEventListener('DOMContentLoaded', () => {
+  initAuthUI();
   // YouTube background
   initYouTubeBackground('bgPlayerMount');
 
