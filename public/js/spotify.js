@@ -1,13 +1,16 @@
 // spotify.js - Spotify auth (PKCE flow), player, now playing, volume/transport
 
 const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
-const REDIRECT_URI = 'http://127.0.0.1:3000/callback';// enable this when deploying to firebase -> 'https://my-study-timer.web.app/callback'; // Update this to your Firebase URL
+const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
 const SCOPES = [
   'streaming',
+  'user-read-email',
+  'user-read-private',
   'user-read-playback-state',
   'user-modify-playback-state',
   'user-read-currently-playing'
 ].join(' ');
+
 
 let spotifyPlayer = null;
 let spotifyDeviceId = null;
@@ -181,7 +184,7 @@ export function initSpotifyAuth({ onReady }) {
   const loginBtn = document.getElementById('loginSpotify');
   loginBtn?.addEventListener('click', initiateLogin);
 
-  // Check if we just returned from OAuth callback (handles case where callback.html redirects back)
+  // Check if just returned from OAuth callback; handles case where callback.html redirects back
   const params = new URLSearchParams(window.location.search);
   const token = params.get('access_token');
   if (token) {
@@ -192,7 +195,7 @@ export function initSpotifyAuth({ onReady }) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 
-  // Listen for messages from callback window (if using popup)
+  // Listen for messages from callback window if using popup
   window.addEventListener('message', async (ev) => {
     if (ev.data && ev.data.type === 'spotify-auth-success') {
       setAccessToken(ev.data.access_token);
@@ -215,7 +218,7 @@ async function initiateLogin() {
   const codeVerifier = generateRandomString(128);
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  // Store code_verifier in sessionStorage (only needed during this session)
+  // Store code_verifier in sessionStorage
   sessionStorage.setItem('spotify_code_verifier', codeVerifier);
 
   // Build authorization URL
@@ -228,7 +231,7 @@ async function initiateLogin() {
     code_challenge_method: 'S256'
   });
 
-  // Open in popup or redirect (using popup approach)
+  // Open in popup
   window.open(
     'https://accounts.spotify.com/authorize?' + params.toString(),
     'spotify-login',
