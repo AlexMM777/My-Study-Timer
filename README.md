@@ -39,16 +39,18 @@ This app is designed for local use so your Spotify credentials and tokens remain
         - Firebase deployment: https://my-study-timer.web.app/callback (replace with your Firebase URL)
 
 4) Create your .env file
-    - Copy: cp .env.example .env
+    - Copy .env.example into .env
     - Edit .env and set:
-        - SPOTIFY_CLIENT_ID=your_client_id_here
         - PORT=3000
+5) Modify your Client ID
+    - Inside spotfy.js and callback.html:
+        - SPOTIFY_CLIENT_ID=your_client_id_here
 
-5) Run the server
+6) Run the server
     - npm start
     - Open http://127.0.0.1:3000/ in your browser.
 
-6) Connect Spotify
+7) Connect Spotify
     - Click "Login with Spotify" once. A popup will prompt for authentication.
     - On approval, the popup closes and you're logged in.
     - The login button and status text will hide once the player is ready.
