@@ -1,7 +1,9 @@
 // spotify.js - Spotify auth (PKCE flow), player, now playing, volume/transport
 
 const CLIENT_ID = 'ddfacef7a6e549bcae188f789f23682b';
-const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
+const REDIRECT_URI = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:3000/callback'
+  : 'https://my-study-timer.web.app/callback';
 const SCOPES = [
   'streaming',
   'user-read-email',
