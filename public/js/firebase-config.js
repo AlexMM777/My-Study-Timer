@@ -4,12 +4,12 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { getFirestore, enableIndexedDbPersistence, collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc, increment } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDn609sNiSGgE9d1EzXrz0nkAfpy8--z0Y",
-  authDomain: "my-study-timer.firebaseapp.com",
-  projectId: "my-study-timer",
-  storageBucket: "my-study-timer.firebasestorage.app",
-  messagingSenderId: "1062897265598",
-  appId: "1:1062897265598:web:26c3e9b66b23d61887e7ef"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 // Initialize Firebase
