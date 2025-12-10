@@ -117,6 +117,13 @@
         
         // Store tokens in localStorage
         localStorage.setItem('spotify_access_token', data.access_token);
+
+        // NEW: Calculate and store expiry timestamp immediately
+        if (data.expires_in) {
+          const expiry = Date.now() + (data.expires_in * 1000);
+          localStorage.setItem('spotify_token_expires_at', expiry);
+        }
+
         if (data.refresh_token) {
           localStorage.setItem('spotify_refresh_token', data.refresh_token);
         }
@@ -132,7 +139,8 @@
           window.opener.postMessage({
             type: 'spotify-auth-success',
             access_token: data.access_token,
-            refresh_token: data.refresh_token
+            refresh_token: data.refresh_token,
+            expires_in: data.expires_in // NEW: Send expiration to parent
           }, '*');
           setTimeout(() => window.close(), 1000);
         } else {

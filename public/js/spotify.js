@@ -58,11 +58,24 @@ function getAccessToken() {
   return localStorage.getItem('spotify_access_token');
 }
 
-function setAccessToken(token) {
+// NEW: Helper to check when the token expires
+function getTokenExpiry() {
+  const expiry = localStorage.getItem('spotify_token_expires_at');
+  return expiry ? parseInt(expiry, 10) : 0;
+}
+
+// UPDATED: Now accepts expiresInSeconds to calculate absolute expiry
+function setAccessToken(token, expiresInSeconds) {
   if (token) {
     localStorage.setItem('spotify_access_token', token);
+    if (expiresInSeconds) {
+      // Calculate expiry timestamp (current time + seconds * 1000)
+      const expiry = Date.now() + (expiresInSeconds * 1000);
+      localStorage.setItem('spotify_token_expires_at', expiry);
+    }
   } else {
     localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem('spotify_token_expires_at');
   }
 }
 
@@ -78,11 +91,17 @@ function setRefreshToken(token) {
   }
 }
 
+// UPDATED: Checks expiry before returning the token
 async function fetchToken() {
   let token = getAccessToken();
-  if (token) return token;
+  const expiry = getTokenExpiry();
 
-  // Try to refresh if refresh token exists
+  // Check if token exists AND is valid (with a 60s buffer)
+  if (token && expiry > Date.now() + 60000) {
+    return token;
+  }
+
+  // Token is missing or expired; try to refresh
   const refreshToken = getRefreshToken();
   if (refreshToken) {
     token = await refreshAccessToken(refreshToken);
@@ -92,8 +111,10 @@ async function fetchToken() {
   return null;
 }
 
+// UPDATED: passes expires_in to setAccessToken
 async function refreshAccessToken(refreshToken) {
   try {
+    // Note: Ensure this URL matches your actual Spotify token endpoint
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -115,7 +136,10 @@ async function refreshAccessToken(refreshToken) {
     }
 
     const data = await response.json();
-    setAccessToken(data.access_token);
+    
+    // Save new token with its expiration time
+    setAccessToken(data.access_token, data.expires_in);
+    
     if (data.refresh_token) {
       setRefreshToken(data.refresh_token);
     }
@@ -200,7 +224,9 @@ export function initSpotifyAuth({ onReady }) {
   // Listen for messages from callback window if using popup
   window.addEventListener('message', async (ev) => {
     if (ev.data && ev.data.type === 'spotify-auth-success') {
-      setAccessToken(ev.data.access_token);
+      // UPDATED: Pass expires_in to setAccessToken
+      setAccessToken(ev.data.access_token, ev.data.expires_in);
+      
       if (ev.data.refresh_token) {
         setRefreshToken(ev.data.refresh_token);
       }
