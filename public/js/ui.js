@@ -24,6 +24,14 @@ const shortInput = document.getElementById('shortBreakDuration');
 const longInput  = document.getElementById('longBreakDuration');
 const cyclesInput = document.getElementById('cyclesUntilLong');
 const behaviorSelect = document.getElementById('breakMusicBehavior');
+
+const volumeSlider = document.getElementById('masterVolume');
+const volumeLabel = document.getElementById('volValue');
+const musicSlider = document.getElementById('musicVolume');
+const musicLabel = document.getElementById('musicVolValue');
+const sfxSlider = document.getElementById('sfxVolume');
+const sfxLabel = document.getElementById('sfxVolValue');
+
 const showTrackSelect = document.getElementById('showTrackInfo');
 const bgLinksTA = document.getElementById('bgLinks');
 const soundWork = document.getElementById('soundWork');
@@ -52,6 +60,27 @@ export function bindUI(timerControls) {
   soundShort.value = cs.short || '';
   soundLong.value  = cs.long  || '';
 
+  // Init volume slider
+  const state = timerControls.getState();
+  if (Number.isFinite(state.masterVolume)) {
+    const pct = Math.round(state.masterVolume * 100);
+    volumeSlider.value = pct;
+    volumeLabel.textContent = `${pct}%`;
+  }
+
+  // Initialize Sliders from Timer State
+  const vols = timerControls.getVolumes();
+  
+  // Music
+  const musicPct = Math.round(vols.music * 100);
+  musicSlider.value = musicPct;
+  musicLabel.textContent = `${musicPct}%`;
+
+  // SFX
+  const sfxPct = Math.round(vols.sfx * 100);
+  sfxSlider.value = sfxPct;
+  sfxLabel.textContent = `${sfxPct}%`;
+
   // Modal open/close
   settingsBtn?.addEventListener('click', () => modal.style.display = 'block');
   closeSettingsBtn?.addEventListener('click', () => modal.style.display = 'none');
@@ -65,6 +94,28 @@ export function bindUI(timerControls) {
   jumpWorkBtn?.addEventListener('click', () => timerControls.jumpToPhase('work'));
   jumpShortBtn?.addEventListener('click', () => timerControls.jumpToPhase('short'));
   jumpLongBtn?.addEventListener('click', () => timerControls.jumpToPhase('long'));
+
+  // Volume slider listener
+  volumeSlider?.addEventListener('input', (e) => {
+    const pct = e.target.value;
+    volumeLabel.textContent = `${pct}%`;
+    const floatVal = parseInt(pct, 10) / 100.0;
+    timerControls.setMasterVolume(floatVal);
+  });
+
+  // Music Volume Change
+  musicSlider?.addEventListener('input', (e) => {
+    const val = e.target.value;
+    musicLabel.textContent = `${val}%`;
+    timerControls.setMusicVolume(val / 100.0);
+  });
+
+  // SFX Volume Change
+  sfxSlider?.addEventListener('input', (e) => {
+    const val = e.target.value;
+    sfxLabel.textContent = `${val}%`;
+    timerControls.setSfxVolume(val / 100.0);
+  });
 
   // Settings form save
   settingsForm?.addEventListener('submit', (e) => {

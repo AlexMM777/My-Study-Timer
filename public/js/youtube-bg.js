@@ -3,11 +3,12 @@ import { getBgLinks, setBgLinks, normalizeLinks, arraysEqual } from './storage.j
 
 
 export const DEFAULT_BG_LINKS = [
-  'https://www.youtube.com/watch?v=tSreleyZgmg',
-  'https://www.youtube.com/watch?v=B0yp4H9EjAo',
-  'https://www.youtube.com/watch?v=XQ8_GEUPVtU',
-  'https://www.youtube.com/watch?v=99ADFusxELs&t=282s',
-  'https://www.youtube.com/watch?v=MPVb2rvum1A'
+  // Spring Backgrounds
+  'https://youtu.be/qukAeB9ZqTg',
+  'https://youtu.be/G9sdTJGe7go',
+  'https://youtu.be/PMnFB3pMliQ',
+  'https://youtu.be/htbtVHpHKKI',
+  'https://youtu.be/SPOUrcmCUyI'
 ];
 
 

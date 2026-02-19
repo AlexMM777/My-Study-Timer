@@ -26,6 +26,11 @@ let secondsLeft = 0;
 let justTransitioned = false;
 let firstStart = true;
 
+// Volume State
+let masterVolume = 1.0;
+let musicVolume = 1.0;
+let sfxVolume = 1.0; 
+
 // Sounds (can be replaced by custom URLs)
 let dingWork  = new Audio('work_start.wav');
 let dingShort = new Audio('short_break.wav');
@@ -36,6 +41,13 @@ export function applyCustomSoundsFromPrefs() {
   try { if (work)  dingWork.src  = work; }  catch(e) {}
   try { if (short) dingShort.src = short; } catch(e) {}
   try { if (long)  dingLong.src  = long; }  catch(e) {}
+}
+
+// Helper to apply SFX volume to all audio objects
+function applySfxVolume() {
+  dingWork.volume = sfxVolume;
+  dingShort.volume = sfxVolume;
+  dingLong.volume = sfxVolume;
 }
 
 function setPhaseUI() {
@@ -54,21 +66,22 @@ function defaultMinutesForPhase(p) {
 }
 
 async function applyMusicForCurrentPhase(resume) {
-  const workVol = 1.0;
-  const quietVol = 0.2;
+  const quietVol = musicVolume * 0.2; // 20% of set music volume
 
   if (phase === 'work') {
-    await Spotify.setVolume(workVol);
+    await Spotify.setVolume(musicVolume);
     if (resume) await Spotify.resume();
     return;
   }
+  
   if (breakMusicBehavior === 'pause') {
     await Spotify.pause();
   } else if (breakMusicBehavior === 'quiet') {
     await Spotify.setVolume(quietVol);
     if (resume) await Spotify.resume();
   } else {
-    await Spotify.setVolume(workVol);
+    // 'same' behavior
+    await Spotify.setVolume(musicVolume);
     if (resume) await Spotify.resume();
   }
 }
@@ -180,6 +193,12 @@ export function initTimer() {
   if (p.breakMusicBehavior) breakMusicBehavior = p.breakMusicBehavior;
   if (Number.isFinite(p.cyclesUntilLong) && p.cyclesUntilLong >= 1) cyclesUntilLong = p.cyclesUntilLong;
   if (typeof p.showTrackInfo === 'boolean') showTrackInfo = p.showTrackInfo;
+  if (Number.isFinite(p.masterVolume)) masterVolume = p.masterVolume;
+  if (Number.isFinite(p.musicVolume)) musicVolume = p.musicVolume;
+  if (Number.isFinite(p.sfxVolume)) sfxVolume = p.sfxVolume;
+
+  // Apply initial SFX volume
+  applySfxVolume();
 
   // Init display
   phase = 'work';
@@ -197,9 +216,20 @@ export function initTimer() {
     startPause,
     reset,
     jumpToPhase,
+    setMasterVolume: (val) => {
+      // val is 0.0 to 1.0
+      masterVolume = val;
+      // Persist immediately
+      setPrefs({ masterVolume });
+      // Apply immediately without forcing resume (unless already playing)
+      // We pass 'false' for resume so it doesn't auto-start if paused, 
+      // but we might want to update volume even if paused.
+      // Spotify.setVolume works regardless of play state.
+      applyMusicForCurrentPhase(false);
+    },
     getState: () => ({
       phase, minutesLeft, secondsLeft, workTime, shortBreakTime, longBreakTime,
-      breakMusicBehavior, cyclesUntilLong, showTrackInfo
+      breakMusicBehavior, cyclesUntilLong, showTrackInfo, masterVolume
     }),
     saveDurations: ({ work, short, long }) => {
       if (Number.isFinite(work)) workTime = work;
@@ -212,6 +242,20 @@ export function initTimer() {
       if (Number.isFinite(cycles) && cycles >= 1) cyclesUntilLong = cycles;
       if (typeof showTrack === 'boolean') showTrackInfo = showTrack;
       setPrefs({ breakMusicBehavior, cyclesUntilLong, showTrackInfo });
-    }
+    },
+
+    getVolumes: () => ({ music: musicVolume, sfx: sfxVolume }),
+    setMusicVolume: (val) => {
+      musicVolume = val;
+      setPrefs({ musicVolume }); // Auto-save
+      applyMusicForCurrentPhase(false); // Update Spotify immediately
+    },
+    setSfxVolume: (val) => {
+      sfxVolume = val;
+      setPrefs({ sfxVolume }); // Auto-save
+      applySfxVolume(); // Update Audio objects immediately
+      dingWork.currentTime = 0; 
+      dingWork.play().catch(()=>{}); 
+    },
   };
 }
