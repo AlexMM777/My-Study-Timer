@@ -36,7 +36,7 @@ This app is designed for local use so your Spotify credentials and tokens remain
     - Create a new app and copy the Client ID.
     - In your app's settings, add these Redirect URIs:
         - Local development: http://127.0.0.1:3000/callback
-        - Firebase deployment: https://my-study-timer.web.app/callback (replace with your Firebase URL)
+        - Firebase deployment: https://my-study-timer.web.app/callback
 
 4) Create your .env file
     - Copy .env.example into .env
