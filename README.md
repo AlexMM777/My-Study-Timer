@@ -70,8 +70,7 @@ This app is designed for local use so your Spotify credentials and tokens remain
 
 ## Privacy & Security
 
-- Do not commit your .env file. The project's .gitignore is configured to prevent this.
-- **No Client Secret is stored or used.** This app uses the PKCE (Proof Key for Code Exchange) flow, so authentication is client-only and secure.
+- This uses the PKCE (Proof Key for Code Exchange) flow, so authentication is client-only and secure.
 - All user preferences (durations, links, sound URLs) are stored only in your browser's localStorage.
 - Access tokens and refresh tokens are stored securely in localStorage and used to authenticate with Spotify's API.
 
@@ -87,11 +86,11 @@ This app is designed for local use so your Spotify credentials and tokens remain
 - My-Study-Timer/
     - public/
         - index.html
-        - callback.html (Spotify OAuth callback handler)
+        - callback.html
         - style.css
         - js/
             - main.js
-            - spotify.js (PKCE and Spotify controls)
+            - spotify.js
             - storage.js
             - timer.js
             - ui.js
@@ -99,7 +98,7 @@ This app is designed for local use so your Spotify credentials and tokens remain
         - work_start.wav
         - short_break.wav
         - long_break.wav
-    - server.js (Express static server for local use)
+    - server.js
     - package.json
     - .env.example
     - .gitignore

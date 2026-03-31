@@ -27,7 +27,6 @@ let justTransitioned = false;
 let firstStart = true;
 
 // Volume State
-let masterVolume = 1.0;
 let musicVolume = 1.0;
 let sfxVolume = 1.0; 
 
@@ -193,7 +192,6 @@ export function initTimer() {
   if (p.breakMusicBehavior) breakMusicBehavior = p.breakMusicBehavior;
   if (Number.isFinite(p.cyclesUntilLong) && p.cyclesUntilLong >= 1) cyclesUntilLong = p.cyclesUntilLong;
   if (typeof p.showTrackInfo === 'boolean') showTrackInfo = p.showTrackInfo;
-  if (Number.isFinite(p.masterVolume)) masterVolume = p.masterVolume;
   if (Number.isFinite(p.musicVolume)) musicVolume = p.musicVolume;
   if (Number.isFinite(p.sfxVolume)) sfxVolume = p.sfxVolume;
 
@@ -216,20 +214,9 @@ export function initTimer() {
     startPause,
     reset,
     jumpToPhase,
-    setMasterVolume: (val) => {
-      // val is 0.0 to 1.0
-      masterVolume = val;
-      // Persist immediately
-      setPrefs({ masterVolume });
-      // Apply immediately without forcing resume (unless already playing)
-      // We pass 'false' for resume so it doesn't auto-start if paused, 
-      // but we might want to update volume even if paused.
-      // Spotify.setVolume works regardless of play state.
-      applyMusicForCurrentPhase(false);
-    },
     getState: () => ({
       phase, minutesLeft, secondsLeft, workTime, shortBreakTime, longBreakTime,
-      breakMusicBehavior, cyclesUntilLong, showTrackInfo, masterVolume
+      breakMusicBehavior, cyclesUntilLong, showTrackInfo
     }),
     saveDurations: ({ work, short, long }) => {
       if (Number.isFinite(work)) workTime = work;

@@ -25,7 +25,6 @@ const longInput  = document.getElementById('longBreakDuration');
 const cyclesInput = document.getElementById('cyclesUntilLong');
 const behaviorSelect = document.getElementById('breakMusicBehavior');
 
-const volumeSlider = document.getElementById('masterVolume');
 const volumeLabel = document.getElementById('volValue');
 const musicSlider = document.getElementById('musicVolume');
 const musicLabel = document.getElementById('musicVolValue');
@@ -60,14 +59,6 @@ export function bindUI(timerControls) {
   soundShort.value = cs.short || '';
   soundLong.value  = cs.long  || '';
 
-  // Init volume slider
-  const state = timerControls.getState();
-  if (Number.isFinite(state.masterVolume)) {
-    const pct = Math.round(state.masterVolume * 100);
-    volumeSlider.value = pct;
-    volumeLabel.textContent = `${pct}%`;
-  }
-
   // Initialize Sliders from Timer State
   const vols = timerControls.getVolumes();
   
@@ -94,14 +85,6 @@ export function bindUI(timerControls) {
   jumpWorkBtn?.addEventListener('click', () => timerControls.jumpToPhase('work'));
   jumpShortBtn?.addEventListener('click', () => timerControls.jumpToPhase('short'));
   jumpLongBtn?.addEventListener('click', () => timerControls.jumpToPhase('long'));
-
-  // Volume slider listener
-  volumeSlider?.addEventListener('input', (e) => {
-    const pct = e.target.value;
-    volumeLabel.textContent = `${pct}%`;
-    const floatVal = parseInt(pct, 10) / 100.0;
-    timerControls.setMasterVolume(floatVal);
-  });
 
   // Music Volume Change
   musicSlider?.addEventListener('input', (e) => {
