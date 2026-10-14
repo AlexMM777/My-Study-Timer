@@ -4,7 +4,7 @@ import { getBgLinks, setBgLinks, normalizeLinks, arraysEqual } from './storage.j
 
 export const DEFAULT_BG_LINKS = [
   // Fall Backgrounds (Skyrim, Minecraft, Pokemon, LoZ, Stardew Valley)
-  'https://www.youtube.com/watch?v=tSreleyZgmg',
+  'https://www.youtube.com/watch?v=1ljaWHouw3M',
   'https://www.youtube.com/watch?v=B0yp4H9EjAo',
   'https://www.youtube.com/watch?v=XQ8_GEUPVtU',
   'https://www.youtube.com/watch?v=99ADFusxELs&t=282s',

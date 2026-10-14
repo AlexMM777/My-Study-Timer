@@ -118,7 +118,7 @@
         // Store tokens in localStorage
         localStorage.setItem('spotify_access_token', data.access_token);
 
-        // NEW: Calculate and store expiry timestamp immediately
+        // Calculate and store expiry timestamp immediately
         if (data.expires_in) {
           const expiry = Date.now() + (data.expires_in * 1000);
           localStorage.setItem('spotify_token_expires_at', expiry);

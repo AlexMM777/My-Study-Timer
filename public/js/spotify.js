@@ -15,6 +15,11 @@ const SCOPES = [
 
 
 let spotifyPlayer = null;
+let connectPromise = null;
+let refreshPromise = null;       // Prevent two simultaneous refresh requests
+let tokenMaintenanceInterval = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
 let spotifyDeviceId = null;
 let hasConnectedOnce = false;
 
@@ -23,7 +28,7 @@ let lastTrackId = null;
 
 export function getDeviceId() { return spotifyDeviceId; }
 
-/* -------- PKCE helpers -------- */
+/* ~ ~ ~ ~ PKCE helpers ~ ~ ~ ~ */
 function generateRandomString(length) {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
   let result = '';
@@ -53,23 +58,23 @@ async function generateCodeChallenge(codeVerifier) {
   return base64UrlEncode(hash);
 }
 
-/* -------- Token management (localStorage) -------- */
+/* ~ ~ ~ ~ Token management (localStorage) ~ ~ ~ ~ */
 function getAccessToken() {
   return localStorage.getItem('spotify_access_token');
 }
 
-// NEW: Helper to check when the token expires
+// Check when the token expires
 function getTokenExpiry() {
   const expiry = localStorage.getItem('spotify_token_expires_at');
   return expiry ? parseInt(expiry, 10) : 0;
 }
 
-// UPDATED: Now accepts expiresInSeconds to calculate absolute expiry
+// Accepts expiresInSeconds to calculate absolute expiry
 function setAccessToken(token, expiresInSeconds) {
   if (token) {
     localStorage.setItem('spotify_access_token', token);
     if (expiresInSeconds) {
-      // Calculate expiry timestamp (current time + seconds * 1000)
+      // Calculate expiry timestamp
       const expiry = Date.now() + (expiresInSeconds * 1000);
       localStorage.setItem('spotify_token_expires_at', expiry);
     }
@@ -91,35 +96,41 @@ function setRefreshToken(token) {
   }
 }
 
-// UPDATED: Checks expiry before returning the token
+// Get a valid token, refreshing it five min before expiry
+// Requests share one refresh operation, prevents races when the Spotify SDK and "now playing" polling need token simultaneously
 async function fetchToken() {
-  let token = getAccessToken();
+  const savedToken = getAccessToken();
   const expiry = getTokenExpiry();
+  const now = Date.now();
 
-  // Check if token exists AND is valid (with a 60s buffer)
-  if (token && expiry > Date.now() + 60000) {
-    return token;
+  if (savedToken && expiry > now + 5 * 60 * 1000) {
+    return savedToken;
   }
 
-  // Token is missing or expired; try to refresh
   const refreshToken = getRefreshToken();
-  if (refreshToken) {
-    token = await refreshAccessToken(refreshToken);
-    if (token) return token;
+  if (!refreshToken) {
+    return savedToken && expiry > now ? savedToken : null;
   }
 
-  return null;
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken(refreshToken).finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  const renewedToken = await refreshPromise;
+  if (renewedToken) return renewedToken;
+
+  // A temp failure may occur before the old token expires, continue using it while valid
+  const stillValid = getAccessToken();
+  return stillValid && getTokenExpiry() > Date.now() ? stillValid : null;
 }
 
-// UPDATED: passes expires_in to setAccessToken
 async function refreshAccessToken(refreshToken) {
   try {
-    // Note: Ensure this URL matches your actual Spotify token endpoint
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
@@ -128,29 +139,78 @@ async function refreshAccessToken(refreshToken) {
     });
 
     if (!response.ok) {
-      console.error('Token refresh failed:', response.status);
-      setRefreshToken(null);
-      setAccessToken(null);
-      setAuthUI(false, false);
+      const errorData = await response.json().catch(() => ({}));
+      console.warn('Spotify refresh failed:', response.status, errorData.error);
+
+      // Only explicit invalid_grant means the stored refresh credential is no longer accepted
+      if (response.status === 400 && errorData.error === 'invalid_grant') {
+        setRefreshToken(null);
+        setAccessToken(null);
+        showSpotifyError('Spotify authorization expired. Please log in again.');
+      }
       return null;
     }
 
     const data = await response.json();
-    
-    // Save new token with its expiration time
-    setAccessToken(data.access_token, data.expires_in);
-    
-    if (data.refresh_token) {
-      setRefreshToken(data.refresh_token);
+    if (!data.access_token || !data.expires_in) {
+      console.error('Spotify refresh response omitted access_token or expires_in.');
+      return null;
     }
+
+    setAccessToken(data.access_token, data.expires_in);
+
+    // Spotify may rotate the refresh token, keep the old one if it doesn't
+    if (data.refresh_token) setRefreshToken(data.refresh_token);
+
+    console.info('Spotify access token renewed.');
     return data.access_token;
   } catch (error) {
-    console.error('Token refresh error:', error);
-    setRefreshToken(null);
-    setAccessToken(null);
-    setAuthUI(false, false);
+    console.warn('Spotify token refresh temporarily unavailable:', error);
+    // Preserve both tokens and retry later
     return null;
   }
+}
+
+// Keep the login valid even if the SDK is idle or the track display is off
+// Browser timers can pause while a computer sleeps, so catch-up check after the tab wakes up
+function startTokenMaintenance(onReady) {
+  if (tokenMaintenanceInterval) return;
+
+  const maintain = async () => {
+    if (!getRefreshToken()) return;
+    const token = await fetchToken();
+    if (token && !spotifyDeviceId && window.Spotify) {
+      void bootPlayer(onReady);
+    }
+  };
+
+  tokenMaintenanceInterval = setInterval(() => {
+    if (getRefreshToken() && getTokenExpiry() <= Date.now() + 5 * 60 * 1000) {
+      void maintain();
+    }
+  }, 60 * 1000);
+
+  window.addEventListener('online', () => { void maintain(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void maintain();
+  });
+}
+
+// Reconnect after interruptions, with exponential backoff (up to one min)
+function scheduleReconnect(onReady) {
+  if (reconnectTimer || !spotifyPlayer || !getRefreshToken()) return;
+  const delay = Math.min(60000, 2000 * 2 ** Math.min(reconnectAttempts, 5));
+  reconnectAttempts += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (spotifyDeviceId) return;
+    if (!navigator.onLine) {
+      scheduleReconnect(onReady);
+      return;
+    }
+    spotifyPlayer.disconnect();
+    void bootPlayer(onReady);
+  }, delay);
 }
 
 async function getJson(url) {
@@ -177,14 +237,35 @@ function setAuthUI(connected, playerReady) {
   else { status.style.display = 'inline'; status.textContent = 'Not connected'; }
 }
 
+function showSpotifyError(message) {
+  console.warn('Spotify:', message);
+  const status = document.getElementById('spotifyStatus');
+  if (status) {
+    status.style.display = 'inline';
+    status.textContent = message;
+  }
+  // Always allow manual retry via login, valid tokens preserved when SDK connection fails due to network / DRM problem
+  const btn = document.getElementById('loginSpotify');
+  if (btn) btn.style.display = 'inline-flex';
+}
+
 async function transferPlaybackToDevice(deviceId, play = false) {
   const token = await fetchToken();
   if (!token || !deviceId) return;
-  await fetch('https://api.spotify.com/v1/me/player', {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device_ids: [deviceId], play })
-  });
+  try {
+    const response = await fetch('https://api.spotify.com/v1/me/player', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_ids: [deviceId], play })
+    });
+    if (!response.ok) {
+      console.error('Spotify playback transfer failed:', response.status, await response.text());
+      showSpotifyError(`Spotify playback transfer failed (HTTP ${response.status}).`);
+    }
+  } catch (error) {
+    console.error('Spotify playback transfer network error:', error);
+    showSpotifyError('Could not transfer playback to this browser.');
+  }
 }
 
 export function startNowPlayingPolling(show, updateCb) {
@@ -210,6 +291,15 @@ export function initSpotifyAuth({ onReady }) {
   const loginBtn = document.getElementById('loginSpotify');
   loginBtn?.addEventListener('click', initiateLogin);
 
+  // Browser autoplay rules require player activation inside a real user click
+  document.getElementById('startPause')?.addEventListener('click', () => {
+    if (spotifyPlayer) {
+      void spotifyPlayer.activateElement().catch(error => {
+        console.warn('Spotify player activation failed:', error);
+      });
+    }
+  });
+
   // Check if just returned from OAuth callback; handles case where callback.html redirects back
   const params = new URLSearchParams(window.location.search);
   const token = params.get('access_token');
@@ -223,22 +313,26 @@ export function initSpotifyAuth({ onReady }) {
 
   // Listen for messages from callback window if using popup
   window.addEventListener('message', async (ev) => {
+    // Only accept credentials from our own site's OAuth callback
+    if (ev.origin !== window.location.origin) return;
     if (ev.data && ev.data.type === 'spotify-auth-success') {
-      // UPDATED: Pass expires_in to setAccessToken
+      // Pass expires_in to setAccessToken
       setAccessToken(ev.data.access_token, ev.data.expires_in);
-      
+
       if (ev.data.refresh_token) {
         setRefreshToken(ev.data.refresh_token);
       }
       setAuthUI(!!getAccessToken(), !!spotifyDeviceId);
-      bootPlayer(onReady);
+      void bootPlayer(onReady);
     }
   });
 
-  window.onSpotifyWebPlaybackSDKReady = () => bootPlayer(onReady);
+  window.onSpotifyWebPlaybackSDKReady = () => { void bootPlayer(onReady); };
 
   // Initial UI state
   setAuthUI(!!getAccessToken(), !!spotifyDeviceId);
+  if (window.Spotify) void bootPlayer(onReady);
+  startTokenMaintenance(onReady);
 }
 
 async function initiateLogin() {
@@ -268,44 +362,97 @@ async function initiateLogin() {
 }
 
 async function bootPlayer(onReady) {
-  if (!window.Spotify) return;
+  if (!window.Spotify) {
+    showSpotifyError('Spotify SDK has not loaded. Check blocked scripts or reload the page.');
+    return;
+  }
+
   const token = await fetchToken();
-  if (!token) return;
+  if (!token) {
+    if (getRefreshToken()) {
+      showSpotifyError('Spotify temporarily unavailable; will retry automatically.');
+      scheduleReconnect(onReady);
+    } else {
+      setAuthUI(false, false);
+    }
+    return;
+  }
 
   if (!spotifyPlayer) {
     spotifyPlayer = new Spotify.Player({
       name: 'My Study Timer',
-      getOAuthToken: async cb => cb((await fetchToken()) || ''),
+      getOAuthToken: async cb => {
+        const freshToken = await fetchToken();
+        if (!freshToken) showSpotifyError('Spotify access token is unavailable. Log in again.');
+        cb(freshToken || '');
+      },
       volume: 1.0
     });
 
     spotifyPlayer.addListener('ready', ({ device_id }) => {
       spotifyDeviceId = device_id;
+      reconnectAttempts = 0;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      console.info('Spotify player is ready:', device_id);
       setAuthUI(true, true);
-      if (!hasConnectedOnce) { hasConnectedOnce = true; transferPlaybackToDevice(device_id, false); }
+      if (!hasConnectedOnce) {
+        hasConnectedOnce = true;
+        // Transfers the current context
+        void transferPlaybackToDevice(device_id, false);
+      }
       onReady?.();
     });
 
     spotifyPlayer.addListener('not_ready', ({ device_id }) => {
       if (spotifyDeviceId === device_id) spotifyDeviceId = null;
+      hasConnectedOnce = false;
       setAuthUI(true, false);
+      scheduleReconnect(onReady);
     });
 
     spotifyPlayer.addListener('initialization_error', ({ message }) => {
       console.error('init_error:', message);
-      setAuthUI(false, false);
+      showSpotifyError(`Spotify player initialization failed: ${message}`);
     });
     spotifyPlayer.addListener('authentication_error', ({ message }) => {
       console.error('auth_error:', message);
-      setRefreshToken(null);
-      setAccessToken(null);
-      setAuthUI(false, false);
+      showSpotifyError(`Spotify player authentication failed: ${message}`);
+      spotifyDeviceId = null;
+      hasConnectedOnce = false;
+      scheduleReconnect(onReady);
     });
     spotifyPlayer.addListener('account_error', ({ message }) => {
       console.error('account_error:', message);
-      setAuthUI(false, false);
+      showSpotifyError(`Spotify account error: ${message}. Check Premium and app allowlist.`);
     });
-
-    await spotifyPlayer.connect();
+    spotifyPlayer.addListener('playback_error', ({ message }) => {
+      console.error('playback_error:', message);
+      showSpotifyError(`Spotify playback failed: ${message}`);
+    });
+    spotifyPlayer.addListener('autoplay_failed', () => {
+      console.warn('Spotify autoplay blocked. Press Start or manually play a song.');
+      showSpotifyError('Browser blocked autoplay. Press Start or select a song in Spotify.');
+    });
   }
+
+  if (spotifyDeviceId) return;
+  if (connectPromise) return connectPromise;
+
+  setAuthUI(true, false);
+  connectPromise = (async () => {
+    try {
+      const connected = await spotifyPlayer.connect();
+      if (!connected) {
+        showSpotifyError('Spotify player did not connect. Will retry automatically.');
+        scheduleReconnect(onReady);
+      }
+    } catch (error) {
+      console.error('Spotify player connection error:', error);
+      showSpotifyError(`Spotify player connection error: ${error.message || error}`);
+      scheduleReconnect(onReady);
+    } finally {
+      connectPromise = null;
+    }
+  })();
+  return connectPromise;
 }
