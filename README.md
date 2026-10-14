@@ -5,22 +5,21 @@ A customizable Pomodoro timer with YouTube ambience and Spotify Premium controls
 ## Features
 
 - Pomodoro Phases: Work, Short break, Long break with a configurable number of cycles before a long break.
-- Full Timer Control: Pause/resume without losing remaining time, and jump to any phase instantly.
-- Customizable Sound Cues: Plays sound cues for the first work start and automatic phase transitions. You can customize the sounds for work, short, and long breaks by pasting your own audio URLs in the settings.
-- Spotify Premium Integration: Full playback control including login, next/prev track, and a configurable music behavior for breaks (Pause, Quiet, or Same Volume).
-- Custom YouTube Ambience: Use a list of YouTube links as a looping, full-screen background.
-- Clean UI: Medieval-inspired grey theme with a compact and organized settings modal.
+- Timer Control: Pause/resume without losing remaining time, and jump to any phase.
+- Customizable Sound Cues: Plays sound cues for the first work start and automatic phase transitions (Customizable sounds for work, short, and long breaks by pasting your own audio URLs in the settings).
+- Integrated Spotify Premium: Playback control with login, next/prev track, and configurable music behavior for breaks (Pause, Quiet, or Same Volume).
+- Custom YouTube Background: Use a list of YouTube links for looping backgrounds.
 
 ## Demo (local)
 
-This app is designed for local use so your Spotify credentials and tokens remain private.
+App for local use so your Spotify credentials and tokens remain private.
 
 ## Prerequisites
 
     - Node.js 18+ (for fetch, ESM-compatible dependencies)
     - A Spotify Premium account
     - A Spotify Developer App (for Client ID)
-    - A modern desktop browser (Chrome, Edge, Firefox, Safari)
+    - Desktop browser (Chrome, Edge, Firefox, Safari)
 
 ## Quick Start
 
@@ -51,15 +50,14 @@ This app is designed for local use so your Spotify credentials and tokens remain
     - Open http://127.0.0.1:3000/ in your browser.
 
 7) Connect Spotify
-    - Click "Login with Spotify" once. A popup will prompt for authentication.
+    - Click "Login with Spotify". A popup will prompt for authentication.
     - On approval, the popup closes and you're logged in.
-    - The login button and status text will hide once the player is ready.
-    - Press Start to begin your timer and music.
+    - Press Start to begin the timer and music.
 
 ## Using the App
 
 - Timer Controls: Use the main buttons below the timer to Start, Pause, or Reset.
-- Jump Phases: Use the control (Work | Short | Long) to skip the current phase and jump directly to another.
+- Jump Phases: Use the control (Work | Short | Long) to skip the current phase and jump to another.
 - Settings (Gear Icon):
     - Durations: The length in minutes for Work, Short, and Long breaks.
     - Cycle Length: The number of short breaks to complete before a long break.
@@ -70,14 +68,14 @@ This app is designed for local use so your Spotify credentials and tokens remain
 
 ## Privacy & Security
 
-- This uses the PKCE (Proof Key for Code Exchange) flow, so authentication is client-only and secure.
-- All user preferences (durations, links, sound URLs) are stored only in your browser's localStorage.
-- Access tokens and refresh tokens are stored securely in localStorage and used to authenticate with Spotify's API.
+- This uses the PKCE (Proof Key for Code Exchange) flow, so authentication is client-only.
+- All user preferences (durations, links, sound URLs) are stored in your browser's localStorage.
+- Access tokens and refresh tokens are stored in localStorage and used to authenticate with Spotify's API.
 
 ## Common Issues
 
 - Background Video Paused on Load: The player is muted and attempts to autoplay. If a browser blocks it, a simple page refresh usually resolves it as the script retries on buffering.
-- Low Video Quality: The app requests the highest video quality, but playback depends on the YouTube original and your network speed.
+- Low Video Quality: The app requests the highest video quality, but playback depends on the YouTube original and network speed.
 - Spotify Controls Don’t Work: Ensure your Spotify account is Premium and that "My Study Timer" is the active device in Spotify. The app attempts to transfer playback automatically on the first connection.
 - ECONNRESET Error: Usually temporary. Double-check your firewall, VPN, and that all Redirect URIs in Spotify dashboard and .env match exactly.
 
