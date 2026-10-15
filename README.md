@@ -43,7 +43,7 @@ App for local use so your Spotify credentials and tokens remain private.
         - PORT=3000
 5) Modify your Client ID
     - Inside spotfy.js and callback.html:
-        - SPOTIFY_CLIENT_ID=your_client_id_here
+        - CLIENT_ID=your_client_id_here
 
 6) Run the server
     - npm start
