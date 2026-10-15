@@ -76,7 +76,7 @@ App for local use so your Spotify credentials and tokens remain private.
 
 - Background Video Paused on Load: The player is muted and attempts to autoplay. If a browser blocks it, a simple page refresh usually resolves it as the script retries on buffering.
 - Low Video Quality: The app requests the highest video quality, but playback depends on the YouTube original and network speed.
-- Spotify Controls Don’t Work: Ensure your Spotify account is Premium and that "My Study Timer" is the active device in Spotify. The app attempts to transfer playback automatically on the first connection.
+- Spotify Controls Don’t Work: Ensure your Spotify account is Premium and that "My Study Timer" is the active device in Spotify. The app attempts to transfer playback automatically on the first connection. If fail to connect, check if browser privacy settings, content-blocking extensions, or network restrictions are blocking Spotify's playback services.
 - ECONNRESET Error: Usually temporary. Double-check your firewall, VPN, and that all Redirect URIs in Spotify dashboard and .env match exactly.
 
 ## Project Structure
