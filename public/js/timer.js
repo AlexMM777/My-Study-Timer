@@ -1,31 +1,19 @@
-// timer.js - timer state machine, sounds, and phase logic
 import * as Spotify from './spotify.js';
 import { getPrefs, setPrefs, getCustomSounds } from './storage.js';
-
-const workLabel  = document.getElementById('work');
+import { TimerEngine, duration } from './timer-engine.mjs';
+const workLabel = document.getElementById('work');
 const shortLabel = document.getElementById('short');
-const longLabel  = document.getElementById('long');
-const minutesEl  = document.getElementById('minutes');
-const secondsEl  = document.getElementById('seconds');
-
-let workTime = 50;
-let shortBreakTime = 10;
-let longBreakTime = 20;
-
+const longLabel = document.getElementById('long');
+const minutesEl = document.getElementById('minutes');
+const secondsEl = document.getElementById('seconds');
 let breakMusicBehavior = 'quiet'; // 'pause' | 'quiet' | 'same'
 let cyclesUntilLong = 4;
 let showTrackInfo = true;
 
-let isPaused = true;
-let timerInterval = null;
-let phase = 'work'; // 'work' | 'short' | 'long'
-let completedWorkCycles = 0;
-let minutesLeft = workTime;
-let secondsLeft = 0;
 
-let justTransitioned = false;
-let firstStart = true;
-
+let phase = 'work';
+let engine;
+const listeners = new Set();
 // Volume State
 let musicVolume = 1.0;
 let sfxVolume = 1.0;
@@ -76,32 +64,24 @@ function applySfxVolume() {
   dingLong.volume = effectiveVolume;
 }
 
-function setPhaseUI() {
-  [workLabel, shortLabel, longLabel].forEach(el =>
-    el && el.classList.remove('active', 'selected')
-  );
 
-  if (phase === 'work')
-    workLabel?.classList.add('active', 'selected');
-
-  if (phase === 'short')
-    shortLabel?.classList.add('active', 'selected');
-
-  if (phase === 'long')
-    longLabel?.classList.add('active', 'selected');
+function render() {
+  phase = engine.phase;
+  const seconds = Math.ceil(engine.remaining / 1000);
+  minutesEl.textContent = Math.floor(seconds / 60);
+  secondsEl.textContent = String(seconds % 60).padStart(2, '0');
+  [workLabel, shortLabel, longLabel].forEach((el, i) => {
+    el?.classList.toggle('active', ['work', 'short', 'long'][i] === phase);
+    el?.classList.toggle('selected', ['work', 'short', 'long'][i] === phase);
+  });
+  const startButton = document.getElementById('startPause');
+  if (startButton.dataset.paused !== String(engine.paused)) {
+    startButton.innerHTML = engine.paused ? '<i class="fa-solid fa-play"></i>' : '<i class="fa-solid fa-pause"></i>';
+    startButton.dataset.paused = String(engine.paused);
+  }
+  document.getElementById('startPause').setAttribute('aria-label', engine.paused ? 'Start timer' : 'Pause timer');
+  document.getElementById('reset').style.display = engine.started ? 'block' : 'none';
 }
-
-function setDisplay(min, sec) {
-  minutesEl.textContent = min;
-  secondsEl.textContent = sec < 10 ? `0${sec}` : sec;
-}
-
-function defaultMinutesForPhase(p) {
-  return p === 'work'
-    ? workTime
-    : (p === 'short' ? shortBreakTime : longBreakTime);
-}
-
 // Spotify music behavior with master volume
 async function applyMusicForCurrentPhase(resume) {
 
@@ -135,258 +115,53 @@ async function applyMusicForCurrentPhase(resume) {
   }
 }
 
-function tick() {
-  if (isPaused) return;
 
-  setDisplay(minutesLeft, secondsLeft);
-
-  if (secondsLeft === 0) {
-    if (minutesLeft === 0) {
-      let nextPhase;
-
-      if (phase === 'work') {
-        completedWorkCycles++;
-
-        nextPhase =
-          (completedWorkCycles % cyclesUntilLong === 0)
-            ? 'long'
-            : 'short';
-      } else {
-        nextPhase = 'work';
-      }
-
-      justTransitioned = true;
-      phaseStart(nextPhase);
-      return;
-    }
-
-    minutesLeft--;
-    secondsLeft = 59;
-
-  } else {
-    secondsLeft--;
+function onEvent(event) {
+  phase = engine.phase;
+  if (['phase', 'resume', 'jump'].includes(event.kind)) void applyMusicForCurrentPhase(!engine.paused).catch(() => {});
+  if (['pause', 'suspend'].includes(event.kind)) void Spotify.pause().catch(() => {});
+  if (event.kind === 'reset') void Spotify.setVolume(getEffectiveMusicVolume()).catch(() => {});
+  if (event.kind === 'phase') (phase === 'work' ? dingWork : phase === 'short' ? dingShort : dingLong).play().catch(() => {});
+  if (event.kind === 'suspend') {
+    document.getElementById('timerNotice').textContent = 'Timer paused after a long interruption. Uncertain time was not counted.';
   }
-
-  setDisplay(minutesLeft, secondsLeft);
+  // Metrics failures must never interrupt the timer or music controls.
+  for (const listener of listeners) { try { listener(event); } catch (error) { console.error('Activity listener failed', error); } }
 }
-
-function runTimer() {
-  clearInterval(timerInterval);
-
-  setDisplay(minutesLeft, secondsLeft);
-
-  timerInterval = setInterval(tick, 1000);
-}
-
-function playPhaseDingIfTransitioned() {
-  if (!justTransitioned) return;
-
-  try {
-    if (phase === 'work') {
-      dingWork.play().catch(() => {});
-    } else if (phase === 'short') {
-      dingShort.play().catch(() => {});
-    } else {
-      dingLong.play().catch(() => {});
-    }
-  } catch(e) {}
-
-  justTransitioned = false;
-}
-
-function phaseStart(nextPhase) {
-  phase = nextPhase;
-
-  minutesLeft = defaultMinutesForPhase(phase);
-  secondsLeft = 0;
-
-  setPhaseUI();
-  setDisplay(minutesLeft, secondsLeft);
-
-  playPhaseDingIfTransitioned();
-
-  void applyMusicForCurrentPhase(true);
-}
-
 export function startPause() {
-  if (isPaused) {
-
-    document.getElementById('startPause').innerHTML =
-      '<i class="fa-solid fa-pause"></i>';
-
-    document.getElementById('reset').style.display = "block";
-
-    isPaused = false;
-
-    if (firstStart && phase === 'work') {
-      try {
-        dingWork.play().catch(() => {});
-      } catch(e) {}
-
-      firstStart = false;
-    }
-
-    void applyMusicForCurrentPhase(true);
-    runTimer();
-
-  } else {
-
-    document.getElementById('startPause').innerHTML =
-      '<i class="fa-solid fa-play"></i>';
-
-    isPaused = true;
-
-    clearInterval(timerInterval);
-    void Spotify.pause();
-  }
+  if (!engine.started && engine.phase === 'work') dingWork.play().catch(() => {});
+  engine.toggle(); render();
+  document.getElementById('timerNotice').textContent = '';
 }
-
-export function reset() {
-  clearInterval(timerInterval);
-
-  isPaused = true;
-  phase = 'work';
-  completedWorkCycles = 0;
-
-  minutesLeft = defaultMinutesForPhase(phase);
-  secondsLeft = 0;
-
-  setDisplay(minutesLeft, secondsLeft);
-
-  document.getElementById('startPause').innerHTML =
-    '<i class="fa-solid fa-play"></i>';
-
-  document.getElementById('reset').style.display = "none";
-
-  setPhaseUI();
-
-  // Restore music volume
-  void Spotify.setVolume(getEffectiveMusicVolume());
-
-  firstStart = true;
-}
-
-export function jumpToPhase(target) {
-  if (!['work', 'short', 'long'].includes(target)) return;
-
-  clearInterval(timerInterval);
-
-  phase = target;
-
-  minutesLeft = defaultMinutesForPhase(phase);
-  secondsLeft = 0;
-
-  setPhaseUI();
-  setDisplay(minutesLeft, secondsLeft);
-
-  const shouldResume = !isPaused;
-
-  void applyMusicForCurrentPhase(shouldResume);
-
-  if (!isPaused) runTimer();
-}
-
+export function reset() { engine.reset(); render(); }
+export function jumpToPhase(target) { engine.jump(target); render(); }
 export function initTimer() {
-  // Load preferences
   const p = getPrefs();
-
-  if (Number.isFinite(p.workTime))
-    workTime = p.workTime;
-
-  if (Number.isFinite(p.shortBreakTime))
-    shortBreakTime = p.shortBreakTime;
-
-  if (Number.isFinite(p.longBreakTime))
-    longBreakTime = p.longBreakTime;
-
-  if (p.breakMusicBehavior)
-    breakMusicBehavior = p.breakMusicBehavior;
-
-  if (Number.isFinite(p.cyclesUntilLong) &&
-      p.cyclesUntilLong >= 1)
-    cyclesUntilLong = p.cyclesUntilLong;
-
-  if (typeof p.showTrackInfo === 'boolean')
-    showTrackInfo = p.showTrackInfo;
-
-  // Load music and SFX volumes
-  if (Number.isFinite(p.musicVolume))
-    musicVolume = clampVolume(p.musicVolume);
-
-  if (Number.isFinite(p.sfxVolume))
-    sfxVolume = clampVolume(p.sfxVolume);
-
-  // Load saved master volume
-  if (Number.isFinite(p.masterVolume))
-    masterVolume = clampVolume(p.masterVolume);
-
-  // Apply initial SFX volume
-  applySfxVolume();
-
-  // Initialize display
-  phase = 'work';
-  completedWorkCycles = 0;
-  minutesLeft = defaultMinutesForPhase(phase);
-  secondsLeft = 0;
-
-  setDisplay(minutesLeft, secondsLeft);
-  setPhaseUI();
-
-  // Apply custom sounds
-  applyCustomSoundsFromPrefs();
-
-  // Expose controls for UI to bind
+  breakMusicBehavior = ['pause', 'quiet', 'same'].includes(p.breakMusicBehavior) ? p.breakMusicBehavior : 'quiet';
+  cyclesUntilLong = duration(p.cyclesUntilLong, 4); showTrackInfo = p.showTrackInfo !== false;
+  musicVolume = clampVolume(p.musicVolume ?? 1); sfxVolume = clampVolume(p.sfxVolume ?? 1); masterVolume = clampVolume(p.masterVolume ?? 1);
+  engine = new TimerEngine({ work: p.workTime, short: p.shortBreakTime, long: p.longBreakTime, cycles: cyclesUntilLong, emit: onEvent });
+  applyCustomSoundsFromPrefs(); render();
+  setInterval(() => { engine.tick(); render(); }, 1000);
+  document.addEventListener('visibilitychange', () => { engine.tick(); render(); });
   return {
-    startPause,
-    reset,
-    jumpToPhase,
-
-    getState: () => ({
-      phase,
-      minutesLeft,
-      secondsLeft,
-      workTime,
-      shortBreakTime,
-      longBreakTime,
-      breakMusicBehavior,
-      cyclesUntilLong,
-      showTrackInfo
-    }),
-
-    saveDurations: ({ work, short, long }) => {
-      if (Number.isFinite(work))
-        workTime = work;
-
-      if (Number.isFinite(short))
-        shortBreakTime = short;
-
-      if (Number.isFinite(long))
-        longBreakTime = long;
-
-      setPrefs({
-        workTime,
-        shortBreakTime,
-        longBreakTime
-      });
+    startPause, reset, jumpToPhase,
+    checkpoint: () => { engine.tick(); return engine.snapshot(); },
+    restore: saved => { const restored = engine.restore(saved); render(); return restored; },
+    subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
+    getState: () => ({ ...engine.snapshot(), minutesLeft: Math.floor(engine.remaining / 60000), secondsLeft: Math.ceil(engine.remaining / 1000) % 60,
+      workTime: engine.durations.work, shortBreakTime: engine.durations.short, longBreakTime: engine.durations.long,
+      breakMusicBehavior, cyclesUntilLong, showTrackInfo }),
+    saveDurations: ({work, short, long}) => {
+      engine.durations = { work: duration(work, engine.durations.work), short: duration(short, engine.durations.short), long: duration(long, engine.durations.long) };
+      setPrefs({ workTime: engine.durations.work, shortBreakTime: engine.durations.short, longBreakTime: engine.durations.long });
     },
-
-    saveBehavior: ({ behavior, cycles, showTrack }) => {
-      if (behavior)
-        breakMusicBehavior = behavior;
-
-      if (Number.isFinite(cycles) && cycles >= 1)
-        cyclesUntilLong = cycles;
-
-      if (typeof showTrack === 'boolean')
-        showTrackInfo = showTrack;
-
-      setPrefs({
-        breakMusicBehavior,
-        cyclesUntilLong,
-        showTrackInfo
-      });
+    saveBehavior: ({behavior, cycles, showTrack}) => {
+      if (['pause','quiet','same'].includes(behavior)) breakMusicBehavior = behavior;
+      cyclesUntilLong = duration(cycles, cyclesUntilLong); engine.cycles = cyclesUntilLong;
+      if (typeof showTrack === 'boolean') showTrackInfo = showTrack;
+      setPrefs({ breakMusicBehavior, cyclesUntilLong, showTrackInfo });
     },
-
     // Include master volume
     getVolumes: () => ({
       music: musicVolume,

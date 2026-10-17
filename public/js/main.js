@@ -24,4 +24,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // UI bindings
   bindUI(controls);
+  // Account services are optional and must never prevent the timer from starting.
+  import('./metrics.js').then(module => module.initMetrics(controls)).catch(error => {
+    document.getElementById('metricsStatus').textContent = 'Tracking unavailable · Timer still works';
+    document.getElementById('openAccount').onclick = () => {
+      document.getElementById('accountMessage').textContent = 'Account services could not load. Check your connection and reload to try again.';
+      document.getElementById('accountDialog').showModal();
+      document.querySelector('[data-close="accountDialog"]').onclick = () => document.getElementById('accountDialog').close();
+    };
+    console.error('Optional account services unavailable', error);
+  });
 });

@@ -2,3 +2,5 @@
 .firebase/
 node_modules
 thumbs.db
+*-debug.log
+*-debug.*.log

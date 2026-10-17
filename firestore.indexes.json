@@ -1,0 +1,6 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "hours", "fieldPath": "coverage", "indexes": [] }
+  ]
+}

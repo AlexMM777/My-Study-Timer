@@ -1,0 +1,52 @@
+rules_version = '2';
+// Private v1 model: studyMetricsV1/{uid} holds version, immutable timeZone, weeklyGoal (seconds).
+// hours/{day_epochHour}: immutable day/hourStart plus 3,600 characters of second-level coverage.
+// days/{YYYY-MM-DD}: day and bounded study/break/pause totals in seconds. No public profiles.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owns(uid) { return request.auth != null && request.auth.uid == uid; }
+    function day(value) { return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+    function validProfile(d) {
+      return d.keys().hasAll(['version', 'timeZone', 'weeklyGoal'])
+        && d.keys().hasOnly(['version', 'timeZone', 'weeklyGoal'])
+        && d.version == 1 && d.timeZone is string && d.timeZone.size() > 0 && d.timeZone.size() <= 100
+        && d.weeklyGoal is int && d.weeklyGoal >= 1800 && d.weeklyGoal <= 604800;
+    }
+    function validHour(d, id) {
+      return d.keys().hasAll(['hourStart', 'day', 'coverage'])
+        && d.keys().hasOnly(['hourStart', 'day', 'coverage'])
+        && d.hourStart is int && d.hourStart >= 0 && d.hourStart % 3600000 == 0
+        && d.hourStart <= request.time.toMillis()
+        && day(d.day) && id == d.day + '_' + string(d.hourStart)
+        && d.coverage is string && d.coverage.size() == 3600 && d.coverage.matches('^[0-3]+$');
+    }
+    function validDay(d, id) {
+      return d.keys().hasAll(['day', 'study', 'break', 'pause'])
+        && d.keys().hasOnly(['day', 'study', 'break', 'pause'])
+        && day(d.day) && id == d.day
+        && d.study is int && d.break is int && d.pause is int
+        && d.study >= 0 && d.break >= 0 && d.pause >= 0
+        // Local days may be 25 hours during daylight-saving transitions.
+        && d.study + d.break + d.pause <= 90000;
+    }
+    match /studyMetricsV1/{uid} {
+      allow read: if owns(uid);
+      allow create: if owns(uid) && validProfile(request.resource.data);
+      allow update: if owns(uid) && validProfile(request.resource.data)
+        && request.resource.data.timeZone == resource.data.timeZone;
+      match /hours/{id} {
+        allow read: if owns(uid);
+        allow create: if owns(uid) && validHour(request.resource.data, id);
+        allow update: if owns(uid) && validHour(request.resource.data, id)
+          && request.resource.data.hourStart == resource.data.hourStart
+          && request.resource.data.day == resource.data.day;
+      }
+      match /days/{id} {
+        allow read: if owns(uid);
+        allow create, update: if owns(uid) && validDay(request.resource.data, id);
+      }
+    }
+    // All legacy collections retain their current denied client access. Existing data is untouched.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -16,13 +16,22 @@
 
   <!-- CSS -->
   <link rel="stylesheet" href="/style.css"/>
+  <link rel="stylesheet" href="/metrics.css"/>
 
   <!-- Spotify Web Playback SDK -->
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="/favicon.ico?v=hourglass-b" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=hourglass-b">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=hourglass-b">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=hourglass-b">
 </head>
 <body>
+  <nav class="account-bar" aria-label="Study account">
+    <span id="metricsStatus" role="status">Metrics off · Sign in to save your study time</span>
+    <button id="openStats" hidden>My stats</button>
+    <button id="openAccount">Sign in</button>
+  </nav>
   <!-- Fullscreen muted background -->
   <div class="bg-video">
     <div id="bgPlayerMount"></div>
@@ -67,6 +76,7 @@
         <button class="seg" id="jumpShort" aria-label="Jump to Short break">Short</button>
         <button class="seg" id="jumpLong" aria-label="Jump to Long break">Long</button>
       </div>
+      <p id="timerNotice" class="timer-notice" role="status"></p>
     </div>
   </section>
 
@@ -85,19 +95,19 @@
         <!-- Durations -->
         <div class="field">
           <label for="workDuration">Work (minutes)</label>
-          <input type="number" id="workDuration" min="1" value="50">
+          <input type="number" id="workDuration" min="1" max="1440" value="50" required>
         </div>
         <div class="field">
           <label for="shortBreakDuration">Short break (minutes)</label>
-          <input type="number" id="shortBreakDuration" min="1" value="10">
+          <input type="number" id="shortBreakDuration" min="1" max="1440" value="10" required>
         </div>
         <div class="field">
           <label for="longBreakDuration">Long break (minutes)</label>
-          <input type="number" id="longBreakDuration" min="1" value="20">
+          <input type="number" id="longBreakDuration" min="1" max="1440" value="20" required>
         </div>
         <div class="field">
           <label for="cyclesUntilLong">Short breaks before long break</label>
-          <input type="number" id="cyclesUntilLong" min="1" value="4">
+          <input type="number" id="cyclesUntilLong" min="1" max="1440" value="4" required>
         </div>
 
         <!-- Volume Controls -->
@@ -169,6 +179,42 @@
   </div>
 
   <!-- App modules -->
+  <dialog id="accountDialog" class="study-dialog" aria-labelledby="accountTitle">
+    <button class="dialog-close" data-close="accountDialog" aria-label="Close account">×</button>
+    <p class="eyebrow">YOUR STUDY SPACE</p>
+    <h2 id="accountTitle">Save your progress</h2>
+    <p id="accountDescription">Sign in to track your study time. The timer is always free to use without an account.</p>
+    <p id="accountIdentity"></p>
+    <button id="googleAccount" class="primary">Continue with Google</button>
+    <form id="accountForm">
+      <label for="accountEmail">Email</label><input id="accountEmail" type="email" autocomplete="email" required maxlength="254">
+      <label for="accountPassword">Password</label><input id="accountPassword" type="password" autocomplete="current-password" required minlength="8" maxlength="128">
+      <button id="emailAccount" class="primary" type="submit">Sign in with email</button>
+    </form>
+    <div class="account-actions">
+      <button id="toggleSignup">Create an account</button><button id="resetPassword">Forgot password?</button>
+      <button id="verifyEmail" hidden>Send verification email</button><button id="signOutAccount" hidden>Sign out</button>
+    </div>
+    <p id="accountMessage" role="status"></p>
+    <small>Spotify connects separately and does not sign you into study tracking.</small>
+  </dialog>
+  <dialog id="statsDialog" class="study-dialog stats-dialog" aria-labelledby="statsTitle">
+    <button class="dialog-close" data-close="statsDialog" aria-label="Close statistics">×</button>
+    <p class="eyebrow">SMALL SESSIONS. LASTING PROGRESS.</p><h2 id="statsTitle">Your study rhythm</h2>
+    <p id="statsContext"></p><p id="statsMessage" role="status"></p>
+    <div id="statsTotals" class="stats-totals"></div>
+    <form id="goalForm" class="goal-form"><label for="weeklyGoal">Weekly study goal (hours)</label>
+      <input id="weeklyGoal" type="number" min="0.5" max="168" step="0.5" value="5" required><button type="submit">Save goal</button>
+    </form>
+    <progress id="goalProgress" max="1" value="0" aria-label="Weekly goal progress"></progress><p id="goalText"></p>
+    <h3>Last 7 days</h3><div id="dailyChart" class="daily-chart" aria-label="Daily study time"></div>
+    <h3>90-day study calendar</h3><div id="heatmap" class="heatmap"></div><p id="streakText"></p>
+    <h3>Time of day</h3><p class="subtle">Study time across the history loaded below.</p><div id="hourChart" class="hour-chart"></div>
+    <h3>Activity timeline</h3><p class="subtle">Overlapping activity is counted once. Study takes priority over breaks and pauses.</p>
+    <div id="activityHistory"></div><button id="loadHistory" hidden>Load older activity</button>
+    <button id="refreshStats">Refresh cloud history</button>
+    <small>Private, personal estimates of timer activity. Background time counts; long interruptions are excluded conservatively.</small>
+  </dialog>
   <script type="module" src="/js/storage.js"></script>
   <script type="module" src="/js/youtube-bg.js"></script>
   <script type="module" src="/js/spotify.js"></script>
