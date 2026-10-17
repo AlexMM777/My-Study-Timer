@@ -1,5 +1,5 @@
 import { firebaseConfig } from './firebase-config.js';
-import { addSpan } from './metrics-core.mjs';
+import { addSpan, dayKey, shiftDay, mergeCoverage, EMPTY } from './metrics-core.mjs';
 import { openLocal, readLocal, writeLocal } from './metrics-local.mjs';
 import { cloudStore } from './metrics-cloud.mjs';
 import { renderStats } from './metrics-view.mjs';
@@ -70,6 +70,8 @@ export async function initMetrics(timer) {
       const writes = await cloud.sync(pending);
       if (generation !== gen || auth.currentUser?.uid !== uid) return;
       for (const [id, entry] of Object.entries(pending)) {
+        if (stats.patternHours) stats.patternHours[id] = { ...entry,
+          coverage: mergeCoverage(stats.patternHours[id]?.coverage || EMPTY, entry.coverage) };
         if (current.queue[id]?.coverage === entry.coverage) delete current.queue[id];
       }
       lastSync = Date.now();
@@ -189,13 +191,14 @@ export async function initMetrics(timer) {
     user = next; state = null; store = null; statsLoaded = false;
     stats = { days: [], hours: {}, base: {}, cursor: null, more: false };
     $('statsDialog').close();
-    for (const id of ['statsTotals','activityHistory','dailyChart','heatmap','hourChart','statsContext','statsMessage','streakText','goalText']) $(id).replaceChildren();
+    for (const id of ['statsTotals','activityHistory','dailyChart','heatmap','hourChart','statsContext','statsMessage','streakText','goalText','calendarDetail','hourDetail','patternContext']) $(id).replaceChildren();
+    $('goalForm').hidden = true;
     $('goalProgress').value = 0; $('weeklyGoal').value = 5; $('loadHistory').hidden = true;
     $('accountPassword').value = ''; $('accountEmail').value = ''; signingOut = false; accountUI();
     if (!user) status('Metrics off · Sign in to save your study time');
     else void becomeRecorder(generation);
   });
-  async function loadStats(older = false) {
+  async function loadStats(older = false, refreshPattern = false) {
     if (!user) return;
     const gen = generation, request = ++readSequence;
     $('statsMessage').textContent = 'Loading your history…';
@@ -207,27 +210,31 @@ export async function initMetrics(timer) {
       }
       if (!state?.profile || !store) { $('statsMessage').textContent = 'Connect once to finish setting up your study account.'; return; }
       const cloud = store;
-      const [days, page, base, profile] = await Promise.all([
-        older ? Promise.resolve(stats.days) : cloud.days(), cloud.hours(older ? stats.cursor : null), cloud.pendingBase(state.queue), cloud.settings()
+      const patternSince = shiftDay(dayKey(Date.now(), state.profile.timeZone), -29);
+      const [days, page, base, profile, patternRows] = await Promise.all([
+        older ? Promise.resolve(stats.days) : cloud.days(), cloud.hours(older ? stats.cursor : null), cloud.pendingBase(state.queue), cloud.settings(),
+        !refreshPattern && stats.patternSince === patternSince ? Promise.resolve(null) : cloud.hoursSince(patternSince)
       ]);
       if (gen !== generation || request !== readSequence) return;
       if (profile) state.profile = profile;
       stats = { days, hours: { ...(older ? stats.hours : {}), ...Object.fromEntries(page.rows.map(row => [row.id, row])) },
-        base, cursor: page.cursor, more: page.more };
+        base, cursor: page.cursor, more: page.more, patternSince,
+        patternHours: patternRows ? Object.fromEntries(patternRows.map(row => [row.id, row])) : stats.patternHours };
       statsLoaded = true; $('loadHistory').hidden = !page.more;
       $('weeklyGoal').value = state.profile.weeklyGoal / 3600;
       $('statsMessage').textContent = Object.keys(state.queue).length ? 'Includes progress saved on this device.' : 'Cloud history loaded.';
       paint();
     } catch { if (gen === generation && request === readSequence) $('statsMessage').textContent = 'Cloud history is unavailable. Activity is still tracked on this device; reconnect to refresh totals.'; }
   }
-  $('refreshStats').onclick = () => void loadStats();
+  $('refreshStats').onclick = () => void loadStats(false, true);
   $('loadHistory').onclick = () => void loadStats(true);
+  $('editGoal').onclick = () => { $('goalForm').hidden = !$('goalForm').hidden; };
   $('goalForm').onsubmit = async event => {
     event.preventDefault(); if (!state?.profile || !store || !user) return;
     const goal = Number($('weeklyGoal').value) * 3600;
     if (!Number.isInteger(goal) || goal < 1800 || goal > 604800 || goal === state.profile.weeklyGoal) return;
     const gen = generation;
-    try { await store.goal(goal); if (gen !== generation) return; state.profile.weeklyGoal = goal; await persist(); paint(); $('statsMessage').textContent = 'Weekly goal saved.'; }
+    try { await store.goal(goal); if (gen !== generation) return; state.profile.weeklyGoal = goal; await persist(); $('goalForm').hidden = true; paint(); $('statsMessage').textContent = 'Weekly goal saved.'; }
     catch { $('statsMessage').textContent = 'Goal could not save. Reconnect and try again.'; }
   };
   setInterval(() => {

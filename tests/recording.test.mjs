@@ -7,7 +7,7 @@ import * as core from '../public/js/metrics-core.mjs';
 
 async function harness(disk = new Map()) {
   let now = Date.UTC(2026,9,17,12), nextId = 0, authChange, subscriber, writeGate;
-  const jobs = new Map(), nodes = new Map(), calls = { profile:0, sync:[], reads:0 }, auth = {currentUser:null};
+  const jobs = new Map(), nodes = new Map(), calls = { profile:0, sync:[], reads:0, patternReads:0 }, auth = {currentUser:null};
   const node = id => {
     if (!nodes.has(id)) nodes.set(id, { textContent:'', value:'', hidden:false, open:false, dataset:{},
       close(){this.open=false;}, showModal(){this.open=true;}, replaceChildren(){this.textContent='';},
@@ -25,7 +25,7 @@ async function harness(disk = new Map()) {
     initializeFirestore:()=>({}),memoryLocalCache:()=>({}),initializeApp:()=>({}) };
   const cloud = { profile:async()=>{calls.profile++;return {version:1,timeZone:'UTC',weeklyGoal:18000};},
     sync:async queue=>{calls.sync.push(structuredClone(queue));return 2;},
-    days:async()=>{calls.reads++;return[];},hours:async()=>({rows:[],more:false}),pendingBase:async()=>({}),settings:async()=>null,goal:async()=>{} };
+    days:async()=>{calls.reads++;return[];},hoursSince:async()=>{calls.patternReads++;return[];},hours:async()=>({rows:[],more:false}),pendingBase:async()=>({}),settings:async()=>null,goal:async()=>{} };
   const local = {openLocal:async()=>disk,readLocal:async(_db,uid)=>structuredClone(disk.get(uid)||{queue:{}}),
     writeLocal:async(_db,uid,value)=>{if(writeGate)await writeGate;disk.set(uid,structuredClone(value));}};
   const schedule = (fn,delay,repeat=false) => {const id=++nextId;jobs.set(id,{fn,at:now+delay,delay,repeat});return id;};
@@ -68,6 +68,10 @@ test('brief pauses do not sync; sustained pause saves once and opening stats wri
   await h.advance(30000);h.engine.toggle();await h.advance(40000);assert.equal(h.calls.sync.length,0);
   h.engine.toggle();await h.advance(62000);assert.equal(h.calls.sync.length,1);
   h.node('openStats').onclick();await h.settle();assert.equal(h.calls.sync.length,1);
+  assert.equal(h.calls.patternReads,1);
+  h.node('loadHistory').onclick();await h.settle();assert.equal(h.calls.patternReads,1);
+  h.node('openStats').onclick();await h.settle();assert.equal(h.calls.patternReads,1);
+  h.node('refreshStats').onclick();await h.settle();assert.equal(h.calls.patternReads,2);
   await h.advance(2*60000);assert.equal(h.calls.sync.length,1);
 });
 test('offline queue survives reopening; next account never receives it; sign-out stops recording',async()=>{

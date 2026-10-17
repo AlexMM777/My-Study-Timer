@@ -48,6 +48,13 @@ export function cloudStore(sdk, db, uid) {
       const result = await sdk.getDocs(sdk.query(sdk.collection(db, `${root}/days`), sdk.orderBy('day')));
       return result.docs.map(doc => doc.data());
     },
+    async hoursSince(day) {
+      // Include the earliest local midnight (UTC+14); the view filters by account-local day.
+      const start = Date.parse(`${day}T00:00:00Z`) - 14 * 3600000;
+      const result = await sdk.getDocs(sdk.query(sdk.collection(db, `${root}/hours`),
+        sdk.where('hourStart', '>=', start), sdk.orderBy('hourStart')));
+      return result.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
     async hours(cursor) {
       const clauses = [sdk.orderBy('hourStart', 'desc'), sdk.limit(48)];
       if (cursor) clauses.push(sdk.startAfter(cursor));

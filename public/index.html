@@ -203,13 +203,19 @@
     <p class="eyebrow">SMALL SESSIONS. LASTING PROGRESS.</p><h2 id="statsTitle">Your study rhythm</h2>
     <p id="statsContext"></p><p id="statsMessage" role="status"></p>
     <div id="statsTotals" class="stats-totals"></div>
-    <form id="goalForm" class="goal-form"><label for="weeklyGoal">Weekly study goal (hours)</label>
+    <div class="section-heading"><h3>Your weekly goal</h3><button id="editGoal">Edit goal</button></div>
+    <form id="goalForm" class="goal-form" hidden><label for="weeklyGoal">Weekly study goal (hours)</label>
       <input id="weeklyGoal" type="number" min="0.5" max="168" step="0.5" value="5" required><button type="submit">Save goal</button>
     </form>
     <progress id="goalProgress" max="1" value="0" aria-label="Weekly goal progress"></progress><p id="goalText"></p>
-    <h3>Last 7 days</h3><div id="dailyChart" class="daily-chart" aria-label="Daily study time"></div>
-    <h3>90-day study calendar</h3><div id="heatmap" class="heatmap"></div><p id="streakText"></p>
-    <h3>Time of day</h3><p class="subtle">Study time across the history loaded below.</p><div id="hourChart" class="hour-chart"></div>
+    <h3>Your last 7 days</h3><p class="subtle">Study time each day · breaks and pauses excluded.</p><div id="dailyChart" class="daily-chart" aria-label="Daily study time"></div>
+    <h3>Your study calendar</h3><p class="subtle">Your last 90 days. Select a date to see its study time.</p>
+    <div id="heatmap" class="heatmap"></div>
+    <div class="calendar-legend" aria-label="Study time color legend"><span data-level="0">No study</span><span data-level="1">Under 30m</span><span data-level="2">30–59m</span><span data-level="3">1–2h</span><span data-level="4">2h+</span></div>
+    <p id="calendarDetail" class="chart-detail" aria-live="polite"></p><p id="streakText" class="subtle"></p>
+    <h3>When you study</h3><p id="patternContext" class="subtle"></p>
+    <p class="subtle">Total study time in each hour of the day. Select a bar for details; swipe sideways on smaller screens.</p>
+    <div class="chart-scroll"><div id="hourChart" class="hour-chart"></div></div><p id="hourDetail" class="chart-detail" aria-live="polite"></p>
     <h3>Activity timeline</h3><p class="subtle">Overlapping activity is counted once. Study takes priority over breaks and pauses.</p>
     <div id="activityHistory"></div><button id="loadHistory" hidden>Load older activity</button>
     <button id="refreshStats">Refresh cloud history</button>

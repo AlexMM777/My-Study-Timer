@@ -45,6 +45,8 @@ test('real sync transactions count union once; retries and older updates write z
   const page=await store.hours(); assert.equal(counts(page.rows[0].coverage).study,2700);
   const base=await store.pendingBase(a); assert.equal(counts(Object.values(base)[0]).study,2700);
   assert.equal((await store.hours(page.cursor)).rows.length,0);
+  assert.equal((await store.hoursSince('2026-10-16')).length,1);
+  assert.equal((await store.hoursSince('2026-10-18')).length,0);
 });
 test('concurrent devices converge and promotion removes lower-priority seconds', async () => {
   const db=dbFor('concurrent'), store=cloudStore(sdk,db,'concurrent'); await store.profile('UTC');

@@ -66,3 +66,15 @@ test('streak threshold and pending local accounts remain isolated across reopeni
   assert.equal(Object.keys((await readLocal(reopened,'alice')).queue).length,1);
   assert.deepEqual((await readLocal(reopened,'bob')).queue,{}); reopened.close();
 });
+import { hourlyStudy, studyLevel } from '../public/js/stats-model.mjs';
+
+test('study chart excludes older days, unions pending activity, and uses account timezone', () => {
+  const rows = {}, pending = {};
+  const start = Date.UTC(2026,9,17,14);
+  addSpan(rows,{kind:'study',start,end:start+1800000},'America/Chicago');
+  addSpan(pending,{kind:'study',start:start+900000,end:start+2700000},'America/Chicago');
+  addSpan(rows,{kind:'study',start:Date.UTC(2026,8,1,14),end:Date.UTC(2026,8,1,15)},'America/Chicago');
+  const values = hourlyStudy(rows,pending,'2026-09-18','2026-10-17','America/Chicago');
+  assert.equal(values[9],2700); assert.equal(values.reduce((a,b)=>a+b,0),2700);
+  assert.deepEqual([0,1,1799,1800,3599,3600,7199,7200].map(studyLevel),[0,1,1,2,2,3,3,4]);
+});
