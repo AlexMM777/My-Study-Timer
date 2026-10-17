@@ -6,7 +6,7 @@ import { TimerEngine } from '../public/js/timer-engine.mjs';
 import * as core from '../public/js/metrics-core.mjs';
 
 async function harness(disk = new Map()) {
-  let now = Date.UTC(2026,9,17,12), nextId = 0, authChange, subscriber;
+  let now = Date.UTC(2026,9,17,12), nextId = 0, authChange, subscriber, writeGate;
   const jobs = new Map(), nodes = new Map(), calls = { profile:0, sync:[], reads:0 }, auth = {currentUser:null};
   const node = id => {
     if (!nodes.has(id)) nodes.set(id, { textContent:'', value:'', hidden:false, open:false, dataset:{},
@@ -16,7 +16,10 @@ async function harness(disk = new Map()) {
   };
   const engine = new TimerEngine({now:()=>now,work:1440,emit:event=>subscriber?.(event)});
   const timer = { getState:()=>engine.snapshot(), checkpoint:()=>{engine.tick();return engine.snapshot();}, restore:s=>engine.restore(s), subscribe:fn=>{subscriber=fn;} };
-  const events = {}, navigator = {onLine:true,locks:{request:async(_name,_opts,fn)=>fn({})}};
+  const held = new Set();
+  const events = {}, navigator = {onLine:true,locks:{request:async(name,_opts,fn)=>{
+    if(held.has(name))return fn(null);held.add(name);try{return await fn({});}finally{held.delete(name);}
+  }}};
   const sdk = { getAuth:()=>auth,onAuthStateChanged:(_auth,fn)=>{authChange=fn;fn(null);},
     signOut:async()=>{auth.currentUser=null;authChange(null);}, GoogleAuthProvider:class {},
     initializeFirestore:()=>({}),memoryLocalCache:()=>({}),initializeApp:()=>({}) };
@@ -24,7 +27,7 @@ async function harness(disk = new Map()) {
     sync:async queue=>{calls.sync.push(structuredClone(queue));return 2;},
     days:async()=>{calls.reads++;return[];},hours:async()=>({rows:[],more:false}),pendingBase:async()=>({}),settings:async()=>null,goal:async()=>{} };
   const local = {openLocal:async()=>disk,readLocal:async(_db,uid)=>structuredClone(disk.get(uid)||{queue:{}}),
-    writeLocal:async(_db,uid,value)=>{disk.set(uid,structuredClone(value));}};
+    writeLocal:async(_db,uid,value)=>{if(writeGate)await writeGate;disk.set(uid,structuredClone(value));}};
   const schedule = (fn,delay,repeat=false) => {const id=++nextId;jobs.set(id,{fn,at:now+delay,delay,repeat});return id;};
   const context = vm.createContext({console,Intl,URLSearchParams,structuredClone,
     Date:class extends Date {static now(){return now;}}, navigator,
@@ -47,7 +50,9 @@ async function harness(disk = new Map()) {
       await settle();
     }
   }
-  return {engine,calls,disk,node,navigator,events,advance,settle, async login(uid){auth.currentUser={uid,email:`${uid}@example.test`,providerData:[{providerId:'password'}]};authChange(auth.currentUser);await settle();}, async logout(){await node('signOutAccount').onclick();await settle();}};
+  return {engine,calls,disk,node,navigator,events,advance,settle,
+    holdWrites(){let done;writeGate=new Promise(resolve=>{done=resolve;});return()=>{writeGate=null;done();};},
+    async login(uid){auth.currentUser={uid,email:`${uid}@example.test`,providerData:[{providerId:'password'}]};authChange(auth.currentUser);await settle();}, async logout(){await node('signOutAccount').onclick();await settle();}};
 }
 test('guest activity has zero database IO; signed-in uninterrupted work stays local', async()=>{
   const h=await harness();h.engine.toggle();await h.advance(60000);
@@ -75,4 +80,10 @@ test('offline queue survives reopening; next account never receives it; sign-out
   reopened.engine.toggle();await reopened.advance(5000);await reopened.logout();
   const count=reopened.calls.sync.length;await reopened.advance(10000);assert.equal(reopened.calls.sync.length,count);
   assert.equal(reopened.node('metricsStatus').textContent,'Metrics off · Sign in to save your study time');
+});
+test('account switch during a pending local write releases the previous recording lock',async()=>{
+  const h=await harness();const unblock=h.holdWrites();await h.login('alice');await h.login('bob');
+  unblock();await h.settle();await h.login('alice');await h.advance(5000);
+  assert.equal(h.node('metricsStatus').textContent,'Tracking ready');
+  h.engine.toggle();await h.advance(5000);assert.ok(Object.keys(h.disk.get('alice').queue).length);
 });

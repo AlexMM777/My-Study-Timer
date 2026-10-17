@@ -173,7 +173,10 @@ export async function initMetrics(timer) {
         if (state.checkpoint && timer.restore(state.checkpoint)) $('timerNotice').textContent = 'Recovered your last checkpoint. Press start when you are ready.';
         ready = true; signingOut = false;
         status(Object.keys(state.queue).length ? 'Saved on this device · Pending sync' : 'Tracking ready');
-        await persist().catch(() => {}); if (Object.keys(state.queue).length) void sync();
+        await persist().catch(() => {});
+        // A sign-out/account switch can happen while IndexedDB is finishing its checkpoint.
+        if (gen !== generation) return;
+        if (Object.keys(state.queue).length) void sync();
         await new Promise(resolve => { release = resolve; });
       } catch { status('Tracking could not start · Your timer still works'); }
       finally { if (gen === generation) { leader = false; ready = false; } }
