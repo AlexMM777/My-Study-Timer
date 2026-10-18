@@ -3,7 +3,8 @@
   try { saved = localStorage.getItem('studyTheme'); } catch {}
   let theme = saved === 'light' ? 'light' : 'dark';
   function apply() {
-    document.documentElement.dataset.theme = theme;
+    const panel = document.getElementById('statsDialog');
+    if (panel) panel.dataset.theme = theme;
     const button = document.getElementById('themeToggle');
     if (button) { button.textContent = theme === 'dark' ? 'Light theme' : 'Dark theme'; button.setAttribute('aria-pressed', String(theme === 'dark')); button.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); }
   }

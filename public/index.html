@@ -29,7 +29,6 @@
 </head>
 <body>
   <nav class="account-bar" aria-label="Study account">
-    <button id="themeToggle" type="button" aria-pressed="false">Dark theme</button>
     <span id="metricsStatus" role="status">Metrics off · Sign in to save your study time</span>
     <button id="openStats" hidden>My stats</button>
     <button id="openAccount">Sign in</button>
@@ -202,6 +201,7 @@
   </dialog>
   <dialog id="statsDialog" class="study-dialog stats-dialog" aria-labelledby="statsTitle">
     <button class="dialog-close" data-close="statsDialog" aria-label="Close statistics">×</button>
+    <button id="themeToggle" class="theme-control" type="button" aria-pressed="false">Dark theme</button>
     <p class="eyebrow">SMALL SESSIONS. LASTING PROGRESS.</p><h2 id="statsTitle">Your study rhythm</h2>
     <p id="statsContext"></p><p id="statsMessage" role="status"></p>
     <div id="statsTotals" class="stats-totals"></div>
