@@ -1,8 +1,7 @@
 (() => {
-  const preference = matchMedia('(prefers-color-scheme: dark)');
   let saved;
   try { saved = localStorage.getItem('studyTheme'); } catch {}
-  let theme = saved === 'light' || saved === 'dark' ? saved : preference.matches ? 'dark' : 'light';
+  let theme = saved === 'light' ? 'light' : 'dark';
   function apply() {
     document.documentElement.dataset.theme = theme;
     const button = document.getElementById('themeToggle');
@@ -17,5 +16,4 @@
       apply();
     };
   });
-  preference.addEventListener('change', event => { if (!saved) { theme = event.matches ? 'dark' : 'light'; apply(); } });
 })();
