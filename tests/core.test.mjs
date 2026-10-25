@@ -16,7 +16,7 @@ function durations(events) {
   return events.filter(e => e.span).reduce((a,e) => { a[e.span.kind] = (a[e.span.kind] || 0) + e.span.end - e.span.start; return a; }, {});
 }
 test('timestamps handle minute-throttled background callbacks and exact automatic phases', () => {
-  const c = clock({ work: 1, short: 1, long: 2, cycles: 2 });
+  const c = clock({ work: 1, short: 1, long: 2, cycles: 2, autoStartWork: true });
   c.timer.toggle(); c.advance(240000, 60000);
   assert.deepEqual(durations(c.events), { study: 120000, break: 120000 });
   assert.equal(c.timer.phase, 'long'); assert.equal(c.timer.remaining, 60000);
@@ -77,4 +77,25 @@ test('study chart excludes older days, unions pending activity, and uses account
   const values = hourlyStudy(rows,pending,'2026-09-18','2026-10-17','America/Chicago');
   assert.equal(values[9],2700); assert.equal(values.reduce((a,b)=>a+b,0),2700);
   assert.deepEqual([0,1,1799,1800,3599,3600,7199,7200].map(studyLevel),[0,1,1,2,2,3,3,4]);
+});
+
+for (const kind of ['short', 'long']) test(`${kind} break waits for Start by default and idle time is excluded`, () => {
+  const c = clock({work:1,short:1,long:1});
+  c.timer.jump(kind); c.timer.toggle();
+  c.advance(90000,90000);
+  assert.equal(c.timer.phase,'work'); assert.equal(c.timer.paused,true);
+  assert.equal(c.timer.remaining,60000);
+  c.advance(300000);
+  assert.deepEqual(durations(c.events),{break:60000});
+  c.timer.toggle(); c.advance(10000);
+  assert.equal(c.timer.paused,false); assert.equal(c.timer.remaining,50000);
+  assert.deepEqual(durations(c.events),{break:60000,study:10000});
+});
+test('automatic mode resumes work after both short and long breaks', () => {
+  for (const kind of ['short','long']) {
+    const c=clock({work:1,short:1,long:1,autoStartWork:true});
+    c.timer.jump(kind); c.timer.toggle(); c.advance(90000,90000);
+    assert.equal(c.timer.phase,'work'); assert.equal(c.timer.paused,false);
+    assert.deepEqual(durations(c.events),{break:60000,study:30000});
+  }
 });

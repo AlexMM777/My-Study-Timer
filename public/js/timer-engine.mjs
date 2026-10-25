@@ -5,10 +5,11 @@ export function duration(value, fallback) {
   return Number.isInteger(value) && value >= 1 && value <= 1440 ? value : fallback;
 }
 export class TimerEngine {
-  constructor({ now = Date.now, emit = () => {}, work = 50, short = 10, long = 20, cycles = 4 } = {}) {
+  constructor({ now = Date.now, emit = () => {}, work = 50, short = 10, long = 20, cycles = 4, autoStartWork = false } = {}) {
     this.now = now; this.emit = emit;
     this.durations = { work: duration(work, 50), short: duration(short, 10), long: duration(long, 20) };
     this.cycles = duration(cycles, 4);
+    this.autoStartWork = autoStartWork === true;
     this.phase = 'work'; this.remaining = this.durations.work * 60_000;
     this.paused = true; this.started = false; this.completed = 0; this.pauseAt = null;
     this.last = now(); this.revision = 0;
@@ -38,9 +39,14 @@ export class TimerEngine {
         if (this.phase === 'work') {
           this.completed++;
           this.phase = this.completed % this.cycles === 0 ? 'long' : 'short';
-        } else this.phase = 'work';
+        } else {
+          this.phase = 'work';
+          if (!this.autoStartWork) { this.paused = true; this.pauseAt = null; }
+        }
         this.remaining = this.durations[this.phase] * 60_000;
         this.event('phase', cursor);
+        // Waiting after a finished break is idle, not study or a user-initiated pause.
+        if (this.paused) break;
       }
     }
     this.last = at;

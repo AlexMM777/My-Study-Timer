@@ -120,6 +120,10 @@ function onEvent(event) {
   phase = engine.phase;
   if (['phase', 'resume', 'jump'].includes(event.kind)) void applyMusicForCurrentPhase(!engine.paused).catch(() => {});
   if (['pause', 'suspend'].includes(event.kind)) void Spotify.pause().catch(() => {});
+  if (event.kind === 'phase' && engine.paused) {
+    void Spotify.pause().catch(() => {});
+    document.getElementById('timerNotice').textContent = 'Break finished. Press Start when you are ready to study.';
+  }
   if (event.kind === 'reset') void Spotify.setVolume(getEffectiveMusicVolume()).catch(() => {});
   if (event.kind === 'phase') (phase === 'work' ? dingWork : phase === 'short' ? dingShort : dingLong).play().catch(() => {});
   if (event.kind === 'suspend') {
@@ -133,14 +137,14 @@ export function startPause() {
   engine.toggle(); render();
   document.getElementById('timerNotice').textContent = '';
 }
-export function reset() { engine.reset(); render(); }
-export function jumpToPhase(target) { engine.jump(target); render(); }
+export function reset() { engine.reset(); render(); document.getElementById('timerNotice').textContent = ''; }
+export function jumpToPhase(target) { engine.jump(target); render(); document.getElementById('timerNotice').textContent = ''; }
 export function initTimer() {
   const p = getPrefs();
   breakMusicBehavior = ['pause', 'quiet', 'same'].includes(p.breakMusicBehavior) ? p.breakMusicBehavior : 'quiet';
   cyclesUntilLong = duration(p.cyclesUntilLong, 4); showTrackInfo = p.showTrackInfo !== false;
   musicVolume = clampVolume(p.musicVolume ?? 1); sfxVolume = clampVolume(p.sfxVolume ?? 1); masterVolume = clampVolume(p.masterVolume ?? 1);
-  engine = new TimerEngine({ work: p.workTime, short: p.shortBreakTime, long: p.longBreakTime, cycles: cyclesUntilLong, emit: onEvent });
+  engine = new TimerEngine({ work: p.workTime, short: p.shortBreakTime, long: p.longBreakTime, cycles: cyclesUntilLong, autoStartWork: p.autoStartWork === true, emit: onEvent });
   applyCustomSoundsFromPrefs(); render();
   setInterval(() => { engine.tick(); render(); }, 1000);
   document.addEventListener('visibilitychange', () => { engine.tick(); render(); });
@@ -156,11 +160,12 @@ export function initTimer() {
       engine.durations = { work: duration(work, engine.durations.work), short: duration(short, engine.durations.short), long: duration(long, engine.durations.long) };
       setPrefs({ workTime: engine.durations.work, shortBreakTime: engine.durations.short, longBreakTime: engine.durations.long });
     },
-    saveBehavior: ({behavior, cycles, showTrack}) => {
+    saveBehavior: ({behavior, cycles, showTrack, autoStartWork}) => {
       if (['pause','quiet','same'].includes(behavior)) breakMusicBehavior = behavior;
       cyclesUntilLong = duration(cycles, cyclesUntilLong); engine.cycles = cyclesUntilLong;
       if (typeof showTrack === 'boolean') showTrackInfo = showTrack;
-      setPrefs({ breakMusicBehavior, cyclesUntilLong, showTrackInfo });
+      if (typeof autoStartWork === 'boolean') engine.autoStartWork = autoStartWork;
+      setPrefs({ breakMusicBehavior, cyclesUntilLong, showTrackInfo, autoStartWork: engine.autoStartWork });
     },
     // Include master volume
     getVolumes: () => ({

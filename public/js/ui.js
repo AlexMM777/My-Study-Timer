@@ -31,6 +31,7 @@ const shortInput = document.getElementById('shortBreakDuration');
 const longInput = document.getElementById('longBreakDuration');
 const cyclesInput = document.getElementById('cyclesUntilLong');
 const behaviorSelect = document.getElementById('breakMusicBehavior');
+const autoStartWorkSelect = document.getElementById('autoStartWork');
 
 // Volume controls
 const masterSlider = document.getElementById('masterVolume');
@@ -56,6 +57,7 @@ export function bindUI(timerControls) {
 
   // Initialize fields from preferences
   const p = getPrefs();
+  autoStartWorkSelect.value = p.autoStartWork === true ? 'automatic' : 'manual';
 
   if (Number.isFinite(p.workTime))
     workInput.value = p.workTime;
@@ -190,6 +192,7 @@ export function bindUI(timerControls) {
     });
 
     timerControls.saveBehavior({
+      autoStartWork: autoStartWorkSelect.value === 'automatic',
       behavior,
       cycles,
       showTrack
